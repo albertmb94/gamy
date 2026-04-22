@@ -19,13 +19,13 @@
  * 5. Crea un token de autenticación:
  *    turso db tokens create gamy-db
  * 
- * 6. Configura las variables de entorno en un archivo .env:
- *    VITE_TURSO_DB_URL=libsql://gamy-db-usuario.turso.io
- *    VITE_TURSO_DB_AUTH_TOKEN=tu-token-aquí
+ * 6. Configura las variables de entorno en un archivo .env del backend:
+ *    TURSO_DATABASE_URL=libsql://gamy-db-usuario.turso.io
+ *    TURSO_AUTH_TOKEN=tu-token-aquí
  * 
- * 7. Para producción, necesitarás un backend (API) que actúe como 
- *    intermediario entre el frontend y Turso, ya que exponer 
- *    credenciales en el cliente no es seguro.
+ * 7. Si la app usa Vite en el frontend, no expongas estas credenciales
+ *    directamente. Usa un backend (API) como intermediario entre el
+ *    frontend y Turso para mantener los secretos fuera del cliente.
  *    
  *    Opciones recomendadas:
  *    - Cloudflare Workers con @libsql/client
@@ -86,16 +86,9 @@ export function setDbStatusCallback(cb: (status: DbStatus) => void) {
 }
 
 export function checkDbConnection(): DbStatus {
-  // In a real implementation, this would ping the Turso database
-  // For now, it returns 'disconnected' since no DB is configured
-  const dbUrl = import.meta.env.VITE_TURSO_DB_URL;
-  const dbToken = import.meta.env.VITE_TURSO_DB_AUTH_TOKEN;
-
-  if (!dbUrl || !dbToken) {
-    return 'disconnected';
-  }
-
-  // Would attempt connection here
+  // This client-side helper is intentionally offline-first.
+  // Real Turso connectivity should be checked through your backend/API,
+  // which can safely read TURSO_DATABASE_URL and TURSO_AUTH_TOKEN.
   return 'disconnected';
 }
 

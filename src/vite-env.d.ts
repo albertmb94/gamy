@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_TURSO_DB_URL: string;
-  readonly VITE_TURSO_DB_AUTH_TOKEN: string;
+  // Frontend env variables can be declared here if needed.
+  // Turso credentials should stay on the backend/server side.
 }
 
 interface ImportMeta {
