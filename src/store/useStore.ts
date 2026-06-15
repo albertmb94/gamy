@@ -15,7 +15,7 @@ import {
   getSyncQueue,
   clearSyncItem,
 } from '../db/localDb';
-import { syncItemToRemote, checkRemoteConnection } from '../db/turso';
+import { syncItemToRemote, checkRemoteConnection, fetchRemoteState } from '../db/turso';
 
 interface AppState {
   // Data
@@ -307,6 +307,13 @@ export const useStore = create<AppState>()((set, get) => ({
       hydrated: true,
     });
     get().refreshPendingSync();
+
+    // Si hay conexión remota, intentar sincronizar desde Turso
+    const status = await checkRemoteConnection();
+    set({ dbStatus: status });
+    if (status === 'connected') {
+      await get().syncFromRemote();
+    }
   },
 
   refreshPendingSync: async () => {
@@ -352,6 +359,63 @@ export const useStore = create<AppState>()((set, get) => ({
         }
       }
     }
+    get().refreshPendingSync();
+  },
+
+  syncFromRemote: async () => {
+    const remote = await fetchRemoteState();
+    if (remote.matches.length === 0 && remote.players.length === 0 && remote.games.length === 0) {
+      // Turso está vacío: subir datos locales si los hay
+      await get().syncPendingItems();
+      return;
+    }
+
+    // Fusionar datos remotos con locales por ID, manteniendo el más reciente
+    const { games: localGames, players: localPlayers, matches: localMatches, playerAchievements: localAchievements } = get();
+
+    const mergeById = <T extends { id: string; createdAt: string }>(local: T[], remote: T[]): T[] => {
+      const map = new Map<string, T>();
+      local.forEach(item => map.set(item.id, item));
+      remote.forEach(item => {
+        const existing = map.get(item.id);
+        if (!existing || new Date(item.createdAt).getTime() >= new Date(existing.createdAt).getTime()) {
+          map.set(item.id, item);
+        }
+      });
+      return Array.from(map.values());
+    };
+
+    const mergedGames = mergeById(localGames, remote.games);
+    const mergedPlayers = mergeById(localPlayers, remote.players);
+    const mergedMatches = mergeById(localMatches, remote.matches.map(m => ({ ...m, synced: true })));
+
+    // Achievements: clave compuesta
+    const achKey = (a: PlayerAchievement) => `${a.achievementId}:${a.playerId}`;
+    const achMap = new Map<string, PlayerAchievement>();
+    localAchievements.forEach(a => achMap.set(achKey(a), a));
+    remote.playerAchievements.forEach(a => {
+      const existing = achMap.get(achKey(a));
+      if (!existing || new Date(a.unlockedAt).getTime() >= new Date(existing.unlockedAt).getTime()) {
+        achMap.set(achKey(a), a);
+      }
+    });
+    const mergedAchievements = Array.from(achMap.values());
+
+    set({
+      games: mergedGames,
+      players: mergedPlayers,
+      matches: mergedMatches,
+      playerAchievements: mergedAchievements,
+    });
+
+    // Guardar todo en IndexedDB
+    await Promise.all([
+      ...mergedGames.map(g => saveGame(g)),
+      ...mergedPlayers.map(p => savePlayer(p)),
+      ...mergedMatches.map(m => saveMatch(m)),
+      ...mergedAchievements.map(a => saveAchievement(a)),
+    ]);
+
     get().refreshPendingSync();
   },
 

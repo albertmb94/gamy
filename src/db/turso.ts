@@ -1,5 +1,5 @@
 import { createClient, Client } from '@libsql/client/web';
-import { DbStatus } from '../types';
+import { DbStatus, Game, Player, MatchRecord, PlayerAchievement } from '../types';
 
 /**
  * Gamy Database Connection Layer
@@ -241,5 +241,85 @@ export async function syncItemToRemote(
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+function safeJson<T>(value: unknown, fallback: T): T {
+  if (typeof value !== 'string' || !value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function fetchRemoteState(): Promise<{
+  games: Game[];
+  players: Player[];
+  matches: MatchRecord[];
+  playerAchievements: PlayerAchievement[];
+}> {
+  const client = getTursoClient();
+  if (!client) {
+    return { games: [], players: [], matches: [], playerAchievements: [] };
+  }
+
+  try {
+    await ensureSchema();
+    const [gamesRes, playersRes, matchesRes, achievementsRes] = await Promise.all([
+      client.execute('SELECT * FROM games'),
+      client.execute('SELECT * FROM players'),
+      client.execute('SELECT * FROM matches'),
+      client.execute('SELECT * FROM player_achievements'),
+    ]);
+
+    const games: Game[] = (gamesRes.rows as any[]).map(row => ({
+      id: row.id,
+      name: row.name,
+      imageUrl: row.image_url ?? undefined,
+      types: safeJson<string[]>(row.types, []),
+      isExpansion: Boolean(row.is_expansion),
+      baseGameId: row.base_game_id ?? undefined,
+      expansionIds: safeJson<string[]>(row.expansion_ids, []),
+      scoringTemplate: safeJson(row.scoring_template, { type: 'simple', categories: [{ id: 'total', name: 'Total' }] }),
+      allowSpecialVictory: Boolean(row.allow_special_victory),
+      specialVictoryTypes: safeJson<string[]>(row.special_victory_types, []),
+      difficulty: row.difficulty ?? undefined,
+      duration: row.duration ?? undefined,
+      createdAt: row.created_at,
+    }));
+
+    const players: Player[] = (playersRes.rows as any[]).map(row => ({
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      avatar: row.avatar ?? undefined,
+      createdAt: row.created_at,
+    }));
+
+    const matches: MatchRecord[] = (matchesRes.rows as any[]).map(row => ({
+      id: row.id,
+      gameId: row.game_id,
+      date: row.date,
+      playerIds: safeJson<string[]>(row.player_ids, []),
+      activeExpansionIds: safeJson<string[]>(row.active_expansion_ids, []),
+      playerScores: safeJson(row.player_scores, []),
+      winnerId: row.winner_id ?? undefined,
+      firstPlayerId: row.first_player_id ?? undefined,
+      synced: true,
+      createdAt: row.created_at,
+    }));
+
+    const playerAchievements: PlayerAchievement[] = (achievementsRes.rows as any[]).map(row => ({
+      achievementId: row.achievement_id,
+      playerId: row.player_id,
+      unlockedAt: row.unlocked_at,
+      matchId: row.match_id ?? undefined,
+    }));
+
+    return { games, players, matches, playerAchievements };
+  } catch (e) {
+    console.error('Error fetching remote state:', e);
+    return { games: [], players: [], matches: [], playerAchievements: [] };
   }
 }
