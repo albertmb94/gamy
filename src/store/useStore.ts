@@ -330,42 +330,46 @@ export const useStore = create<AppState>()((set, get) => ({
     const sortedQueue = [...queue].sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
 
     for (const item of sortedQueue) {
-      let payload: unknown = null;
-      let type: 'game' | 'player' | 'match' | 'achievement' = item.type;
-      let isDelete = false;
-      let matchId: string | undefined;
+      try {
+        let payload: unknown = null;
+        let type: 'game' | 'player' | 'match' | 'achievement' = item.type;
+        let isDelete = false;
+        let matchId: string | undefined;
 
-      // Formato de id: tipo:id (insert/update) o tipo-del:id (delete)
-      const idParts = item.id.split(':');
-      const baseType = idParts[0]; // ej: 'match' o 'match-del'
-      const realId = idParts.slice(1).join(':'); // por si el UUID contuviera ':'
-      isDelete = baseType.endsWith('-del');
+        // Formato de id: tipo:id (insert/update) o tipo-del:id (delete)
+        const idParts = item.id.split(':');
+        const baseType = idParts[0]; // ej: 'match' o 'match-del'
+        const realId = idParts.slice(1).join(':'); // por si el UUID contuviera ':'
+        isDelete = baseType.endsWith('-del');
 
-      if (item.type === 'match') {
-        matchId = realId;
-        payload = matches.find(m => m.id === matchId) ?? { id: matchId };
-      } else if (item.type === 'player') {
-        payload = players.find(p => p.id === realId) ?? { id: realId };
-      } else if (item.type === 'game') {
-        payload = games.find(g => g.id === realId) ?? { id: realId };
-      } else if (item.type === 'achievement') {
-        const [, achievementId, playerId] = item.id.split(':');
-        payload = playerAchievements.find(a => a.achievementId === achievementId && a.playerId === playerId) ?? { achievementId, playerId };
-      }
-
-      console.log('[syncPendingItems]', { id: item.id, type, isDelete, payload: JSON.stringify(payload).slice(0, 200) });
-      const ok = await syncItemToRemote(type, payload, isDelete);
-      console.log('[syncPendingItems] result:', { id: item.id, ok });
-      if (ok) {
-        await clearSyncItem(item.id);
-        // Marcar la partida como sincronizada si era un insert/update
-        if (type === 'match' && matchId && !isDelete) {
-          set((s) => ({
-            matches: s.matches.map(m => m.id === matchId ? { ...m, synced: true } : m),
-          }));
-          const updatedMatch = get().matches.find(m => m.id === matchId);
-          if (updatedMatch) await saveMatch(updatedMatch);
+        if (item.type === 'match') {
+          matchId = realId;
+          payload = matches.find(m => m.id === matchId) ?? { id: matchId };
+        } else if (item.type === 'player') {
+          payload = players.find(p => p.id === realId) ?? { id: realId };
+        } else if (item.type === 'game') {
+          payload = games.find(g => g.id === realId) ?? { id: realId };
+        } else if (item.type === 'achievement') {
+          const [, achievementId, playerId] = item.id.split(':');
+          payload = playerAchievements.find(a => a.achievementId === achievementId && a.playerId === playerId) ?? { achievementId, playerId };
         }
+
+        console.log('[syncPendingItems]', { id: item.id, type, isDelete, payload: JSON.stringify(payload).slice(0, 200) });
+        const ok = await syncItemToRemote(type, payload, isDelete);
+        console.log('[syncPendingItems] result:', { id: item.id, ok });
+        if (ok) {
+          await clearSyncItem(item.id);
+          // Marcar la partida como sincronizada si era un insert/update
+          if (type === 'match' && matchId && !isDelete) {
+            set((s) => ({
+              matches: s.matches.map(m => m.id === matchId ? { ...m, synced: true } : m),
+            }));
+            const updatedMatch = get().matches.find(m => m.id === matchId);
+            if (updatedMatch) await saveMatch(updatedMatch);
+          }
+        }
+      } catch (e) {
+        console.error('[syncPendingItems] item failed:', { id: item.id }, e);
       }
     }
     const remaining = await getSyncQueue();
