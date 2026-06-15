@@ -320,19 +320,37 @@ export const useStore = create<AppState>()((set, get) => ({
     for (const item of queue) {
       let payload: unknown;
       let type: 'game' | 'player' | 'match' | 'achievement' = item.type;
-      if (item.type === 'match') payload = matches.find(m => m.id === item.id.split(':')[1]);
-      else if (item.type === 'player') payload = players.find(p => p.id === item.id.split(':')[1]);
-      else if (item.type === 'game') payload = games.find(g => g.id === item.id.split(':')[1]);
-      else if (item.type === 'achievement') {
+      let matchId: string | undefined;
+
+      if (item.type === 'match') {
+        matchId = item.id.split(':')[1];
+        payload = matches.find(m => m.id === matchId);
+      } else if (item.type === 'player') {
+        payload = players.find(p => p.id === item.id.split(':')[1]);
+      } else if (item.type === 'game') {
+        payload = games.find(g => g.id === item.id.split(':')[1]);
+      } else if (item.type === 'achievement') {
         const [, achievementId, playerId] = item.id.split(':');
         payload = playerAchievements.find(a => a.achievementId === achievementId && a.playerId === playerId);
       }
+
       if (!payload) {
         await clearSyncItem(item.id);
         continue;
       }
+
       const ok = await syncItemToRemote(type, payload);
-      if (ok) await clearSyncItem(item.id);
+      if (ok) {
+        await clearSyncItem(item.id);
+        // Marcar la partida como sincronizada
+        if (type === 'match' && matchId) {
+          set((s) => ({
+            matches: s.matches.map(m => m.id === matchId ? { ...m, synced: true } : m),
+          }));
+          const updatedMatch = get().matches.find(m => m.id === matchId);
+          if (updatedMatch) await saveMatch(updatedMatch);
+        }
+      }
     }
     get().refreshPendingSync();
   },

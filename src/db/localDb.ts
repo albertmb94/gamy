@@ -2,7 +2,7 @@ import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Game, Player, MatchRecord, PlayerAchievement } from '../types';
 
 const DB_NAME = 'gamy-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 interface GamyDB extends DBSchema {
   games: {
@@ -18,7 +18,7 @@ interface GamyDB extends DBSchema {
     value: MatchRecord;
   };
   achievements: {
-    key: string;
+    key: [string, string];
     value: PlayerAchievement;
   };
   syncQueue: {
@@ -36,13 +36,23 @@ let dbPromise: Promise<IDBPDatabase<GamyDB>> | null = null;
 export function getDb() {
   if (!dbPromise) {
     dbPromise = openDB<GamyDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains('games')) db.createObjectStore('games', { keyPath: 'id' });
-        if (!db.objectStoreNames.contains('players')) db.createObjectStore('players', { keyPath: 'id' });
-        if (!db.objectStoreNames.contains('matches')) db.createObjectStore('matches', { keyPath: 'id' });
-        if (!db.objectStoreNames.contains('achievements')) db.createObjectStore('achievements', { keyPath: 'id' });
-        if (!db.objectStoreNames.contains('syncQueue')) db.createObjectStore('syncQueue', { keyPath: 'id' });
-        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          if (!db.objectStoreNames.contains('games')) db.createObjectStore('games', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('players')) db.createObjectStore('players', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('matches')) db.createObjectStore('matches', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('achievements')) db.createObjectStore('achievements', { keyPath: ['achievementId', 'playerId'] });
+          if (!db.objectStoreNames.contains('syncQueue')) db.createObjectStore('syncQueue', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
+        }
+        if (oldVersion < 2) {
+          // Versión 1 usaba keyPath 'id' para achievements, que no existe en PlayerAchievement.
+          // Recreamos el store con la clave compuesta correcta.
+          if (db.objectStoreNames.contains('achievements')) {
+            db.deleteObjectStore('achievements');
+          }
+          db.createObjectStore('achievements', { keyPath: ['achievementId', 'playerId'] });
+        }
       },
     });
   }
@@ -126,7 +136,11 @@ export async function deleteMatch(id: string) {
 export async function saveAchievement(achievement: PlayerAchievement) {
   const db = await getDb();
   await db.put('achievements', achievement);
-  await db.put('syncQueue', { id: `ach:${achievement.playerId}:${achievement.achievementId}`, type: 'achievement', updatedAt: new Date().toISOString() });
+  await db.put('syncQueue', {
+    id: `ach:${achievement.achievementId}:${achievement.playerId}`,
+    type: 'achievement',
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 export async function setInitialized(value: boolean) {
