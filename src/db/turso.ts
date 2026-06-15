@@ -237,7 +237,7 @@ export async function syncItemToRemote(
       }
       return true;
     } catch (e) {
-      console.error('Turso sync error:', e);
+      console.error('[Turso sync error]', { type, isDelete, payload }, e);
       return false;
     }
   }

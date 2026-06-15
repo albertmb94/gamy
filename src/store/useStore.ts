@@ -352,7 +352,9 @@ export const useStore = create<AppState>()((set, get) => ({
         payload = playerAchievements.find(a => a.achievementId === achievementId && a.playerId === playerId) ?? { achievementId, playerId };
       }
 
+      console.log('[syncPendingItems]', { id: item.id, type, isDelete, payload: JSON.stringify(payload).slice(0, 200) });
       const ok = await syncItemToRemote(type, payload, isDelete);
+      console.log('[syncPendingItems] result:', { id: item.id, ok });
       if (ok) {
         await clearSyncItem(item.id);
         // Marcar la partida como sincronizada si era un insert/update
