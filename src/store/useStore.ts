@@ -416,7 +416,8 @@ export const useStore = create<AppState>()((set, get) => ({
       ...mergedAchievements.map(a => saveAchievement(a)),
     ]);
 
-    get().refreshPendingSync();
+    // Intentar subir cambios locales pendientes y limpiar la cola
+    await get().syncPendingItems();
   },
 
   checkConnection: async () => {
