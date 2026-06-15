@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.3",
     "@types/uuid": "^10.0.0",
     "clsx": "2.1.1",
     "idb": "^8.0.3",
