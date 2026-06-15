@@ -1,6 +1,6 @@
 # Gamy
 
-Gamy es una app web para gestionar una ludoteca de juegos de mesa, registrar partidas, seguir estadísticas y aplicar logros automáticos.
+Gamy es una aplicación web progresiva (PWA) para gestionar una ludoteca de juegos de mesa, registrar partidas, seguir estadísticas y aplicar logros automáticos.
 
 ## Funcionalidades
 
@@ -11,13 +11,14 @@ Gamy es una app web para gestionar una ludoteca de juegos de mesa, registrar par
 - Plantillas de puntuación simples o complejas.
 - Categorías personalizadas en plantillas complejas.
 - Metadatos por categoría para logros automáticos.
-- Registro de partidas con jugadores, expansiones activas, puntuaciones e ისტორico editable.
+- Registro de partidas con jugadores, expansiones activas, puntuaciones e historial editable.
 - Sorteo del jugador inicial.
 - Victorias especiales para 7 Wonders Duel y expansiones compatibles.
 - Rankings globales, por juego y por tipo.
 - Logros automáticos.
 - Indicador visual de estado de base de datos.
-- Persistencia local para mantener datos aunque no haya conexión.
+- Persistencia local robusta con IndexedDB.
+- Sincronización opcional con backend/Turso.
 
 ## Tecnologías
 
@@ -25,11 +26,7 @@ Gamy es una app web para gestionar una ludoteca de juegos de mesa, registrar par
 - Vite
 - Tailwind CSS v4
 - Zustand
-
-## Requisitos
-
-- Node.js 20 o superior
-- npm
+- IndexedDB (`idb`)
 
 ## Instalación
 
@@ -79,116 +76,88 @@ Cuando eliges una de esas victorias, no necesitas introducir puntos para ese jug
 
 ## Persistencia local
 
-La aplicación guarda los datos en el navegador mediante persistencia local. Esto permite seguir trabajando incluso si la base de datos remota todavía no está disponible.
+La aplicación guarda los datos en el navegador mediante **IndexedDB**. Esto permite:
 
-Las partidas creadas quedan almacenadas localmente y se pueden sincronizar más adelante cuando la conexión a Turso esté operativa.
+- Mantener datos aunque no haya conexión.
+- Almacenar grandes volúmenes de partidas sin límite de `localStorage`.
+- Recuperar juegos, jugadores, partidas y logros al volver a abrir la app.
 
-## Turso
+Las partidas creadas quedan almacenadas localmente y se marcan como `synced: false` hasta que se sincronicen con el backend.
 
-La integración con Turso está preparada como base de configuración, pero necesita que completes la conexión con tu backend o cliente de sincronización.
+## Base de datos remota (opcional)
 
-### 1. Crear la base de datos
+La app está preparada para sincronizar con un backend que use Turso.
 
-Instala el CLI de Turso:
+### Configuración
 
-```bash
-curl -sSfL https://get.tur.so/install.sh | bash
-```
-
-Inicia sesión:
+Crea un archivo `.env.local` en la raíz:
 
 ```bash
-turso auth login
+VITE_SYNC_API_URL=https://tu-api.example.com
+VITE_SYNC_API_KEY=tu-api-key (opcional)
 ```
 
-Crea la base de datos:
+Tu backend debe exponer:
 
-```bash
-turso db create gamy-db
-```
+- `GET /health` – para comprobar conectividad.
+- `POST /sync/game` – recibir un juego.
+- `POST /sync/player` – recibir un jugador.
+- `POST /sync/match` – recibir una partida.
+- `POST /sync/achievement` – recibir un logro.
 
-Obtén la URL:
+> **Seguridad:** nunca expongas el token de Turso directamente en el cliente. Siempre usa un backend intermedio.
 
-```bash
-turso db show gamy-db --url
-```
-
-Genera un token:
-
-```bash
-turso db tokens create gamy-db
-```
-
-### 2. Variables de entorno
-
-Si conectas Turso desde un backend o una ruta de servidor, usa estas variables:
-
-```bash
-TURSO_DATABASE_URL=libsql://tu-base-de-datos.turso.io
-TURSO_AUTH_TOKEN=tu-token
-```
-
-Ejemplo de uso en una ruta de servidor o backend:
+### Backend de ejemplo con Express
 
 ```ts
+import express from 'express';
 import { createClient } from '@libsql/client';
 
+const app = express();
+app.use(express.json());
+
 const client = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN,
+  url: process.env.TURSO_DATABASE_URL!,
+  authToken: process.env.TURSO_AUTH_TOKEN!,
 });
+
+app.get('/health', (_req, res) => res.json({ ok: true }));
+
+app.post('/sync/:type', async (req, res) => {
+  const { type } = req.params;
+  // Inserta o reemplaza el recurso en Turso
+  res.json({ ok: true });
+});
+
+app.listen(3000);
 ```
-
-Nota: estas credenciales no deben exponerse en el cliente web. Si la app corre en Vite, lo correcto es pasar por una API propia o un backend intermedio.
-
-### 3. Esquema sugerido
-
-El archivo `src/db/turso.ts` incluye un esquema SQL orientativo para:
-
-- juegos
-- jugadores
-- partidas
-- logros
-
-Puedes usarlo como base para tu migración inicial.
-
-### 4. Conexión en producción
-
-Por seguridad, no se recomienda exponer credenciales de Turso directamente en el cliente.
-
-Lo habitual es usar un backend intermedio, por ejemplo:
-
-- Cloudflare Workers
-- Vercel Edge Functions
-- Express o Fastify
-
-Ese backend puede leer las variables de entorno, conectarse a Turso y sincronizar los cambios desde la app.
 
 ## Estado de conexión
 
 La app muestra un indicador en la cabecera:
 
-- Verde: conectado
-- Naranja: reconectando
-- Gris: desconectado
+- **Verde:** conectado al backend remoto.
+- **Azul:** funcionando con IndexedDB (modo local).
+- **Naranja:** reconectando.
+- **Gris:** desconectado.
 
-Mientras la integración real no esté finalizada, el estado puede permanecer en desconectado.
+Puedes pulsar sobre el contador de "pendientes" para intentar sincronizar manualmente.
 
 ## Estructura del proyecto
 
 - `src/App.tsx`: entrada principal de la interfaz.
 - `src/components/`: pantallas y módulos de la app.
 - `src/data/defaultGames.ts`: ludoteca inicial.
-- `src/db/turso.ts`: configuración y notas de conexión a Turso.
-- `src/store/useStore.ts`: estado global y persistencia local.
+- `src/db/localDb.ts`: persistencia en IndexedDB.
+- `src/db/turso.ts`: conectividad y sincronización con backend remoto.
+- `src/store/useStore.ts`: estado global.
 - `public/images/`: portadas locales de juegos.
 
 ## Notas
 
 - La app está pensada para funcionar bien en móvil y escritorio.
 - El zoom está bloqueado para mantener la interfaz ajustada al ancho del dispositivo.
-- Las partidas quedan registradas localmente aunque Turso todavía no esté conectado.
-- Si añades una conexión real a Turso, recuerda implementar sincronización y resolución de conflictos.
+- Si añades una conexión real a Turso, recuerda implementar sincronización y resolución de conflictos en el backend.
 
 ## Desarrollo
 

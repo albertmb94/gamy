@@ -1,8 +1,21 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { Game, Player, MatchRecord, PlayerAchievement, DbStatus, ViewTab } from '../types';
 import { defaultGames } from '../data/defaultGames';
 import { v4 as uuid } from 'uuid';
+import {
+  loadLocalState,
+  saveGame,
+  savePlayer,
+  saveMatch,
+  saveAchievement,
+  deleteGame as deleteGameDb,
+  deletePlayer as deletePlayerDb,
+  deleteMatch as deleteMatchDb,
+  setInitialized,
+  getSyncQueue,
+  clearSyncItem,
+} from '../db/localDb';
+import { syncItemToRemote, checkRemoteConnection } from '../db/turso';
 
 interface AppState {
   // Data
@@ -11,6 +24,7 @@ interface AppState {
   matches: MatchRecord[];
   playerAchievements: PlayerAchievement[];
   initialized: boolean;
+  hydrated: boolean;
 
   // UI
   currentTab: ViewTab;
@@ -51,8 +65,12 @@ interface AppState {
   addAchievement: (a: PlayerAchievement) => void;
   checkAchievements: (matchId: string) => void;
 
-  // Init
-  initializeDefaults: () => void;
+  // Init & sync
+  initializeDefaults: () => Promise<void>;
+  loadFromLocalDb: () => Promise<void>;
+  refreshPendingSync: () => Promise<void>;
+  syncPendingItems: () => Promise<void>;
+  checkConnection: () => Promise<void>;
 }
 
 const PLAYER_COLORS = [
@@ -60,195 +78,270 @@ const PLAYER_COLORS = [
   '#EC4899', '#06B6D4', '#F97316', '#14B8A6', '#6366F1'
 ];
 
-export const useStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      games: [],
-      players: [],
-      matches: [],
-      playerAchievements: [],
-      initialized: false,
-      currentTab: 'library',
-      dbStatus: 'disconnected',
-      selectedGameId: null,
-      selectedMatchId: null,
-      editingGameId: null,
-      showGameForm: false,
-      showPlaySetup: false,
-      showMatchDetail: null,
-      pendingSyncQueue: [],
+export const useStore = create<AppState>()((set, get) => ({
+  games: [],
+  players: [],
+  matches: [],
+  playerAchievements: [],
+  initialized: false,
+  hydrated: false,
+  currentTab: 'library',
+  dbStatus: 'local',
+  selectedGameId: null,
+  selectedMatchId: null,
+  editingGameId: null,
+  showGameForm: false,
+  showPlaySetup: false,
+  showMatchDetail: null,
+  pendingSyncQueue: [],
 
-      setTab: (tab) => set({ currentTab: tab }),
-      setDbStatus: (s) => set({ dbStatus: s }),
+  setTab: (tab) => set({ currentTab: tab }),
+  setDbStatus: (s) => set({ dbStatus: s }),
 
-      addGame: (gameData) => {
-        const id = uuid();
-        const game: Game = {
-          ...gameData,
-          id,
-          expansionIds: gameData.expansionIds || [],
-          createdAt: new Date().toISOString(),
-        };
-        set((s) => {
-          const games = [...s.games, game];
-          if (game.isExpansion && game.baseGameId) {
-            const baseIdx = games.findIndex(g => g.id === game.baseGameId);
-            if (baseIdx >= 0) {
-              games[baseIdx] = { ...games[baseIdx], expansionIds: [...games[baseIdx].expansionIds, id] };
-            }
-          }
-          return { games };
-        });
-        return id;
-      },
-
-      updateGame: (id, updates) => set((s) => ({
-        games: s.games.map(g => g.id === id ? { ...g, ...updates } : g)
-      })),
-
-      deleteGame: (id) => set((s) => {
-        const game = s.games.find(g => g.id === id);
-        let games = s.games.filter(g => g.id !== id);
-        // Remove from base game's expansionIds
-        if (game?.isExpansion && game.baseGameId) {
-          games = games.map(g => g.id === game.baseGameId
-            ? { ...g, expansionIds: g.expansionIds.filter(eid => eid !== id) }
-            : g
-          );
+  addGame: (gameData) => {
+    const id = uuid();
+    const game: Game = {
+      ...gameData,
+      id,
+      expansionIds: gameData.expansionIds || [],
+      createdAt: new Date().toISOString(),
+    };
+    set((s) => {
+      const games = [...s.games, game];
+      if (game.isExpansion && game.baseGameId) {
+        const baseIdx = games.findIndex(g => g.id === game.baseGameId);
+        if (baseIdx >= 0) {
+          games[baseIdx] = { ...games[baseIdx], expansionIds: [...games[baseIdx].expansionIds, id] };
         }
-        // Also remove child expansions
-        if (!game?.isExpansion) {
-          games = games.filter(g => g.baseGameId !== id);
-        }
-        return { games, matches: s.matches.filter(m => m.gameId !== id) };
-      }),
+      }
+      return { games };
+    });
+    saveGame(game).catch(e => console.error('Error saving game:', e));
+    return id;
+  },
 
-      setSelectedGameId: (id) => set({ selectedGameId: id }),
-      setEditingGameId: (id) => set({ editingGameId: id }),
-      setShowGameForm: (v) => set({ showGameForm: v, editingGameId: v ? get().editingGameId : null }),
+  updateGame: (id, updates) => {
+    set((s) => {
+      const games = s.games.map(g => g.id === id ? { ...g, ...updates } : g);
+      const updated = games.find(g => g.id === id);
+      if (updated) saveGame(updated).catch(e => console.error('Error saving game:', e));
+      return { games };
+    });
+  },
 
-      addPlayer: (name, color) => {
-        const id = uuid();
-        set((s) => ({
-          players: [...s.players, { id, name, color: color || PLAYER_COLORS[s.players.length % PLAYER_COLORS.length], createdAt: new Date().toISOString() }]
-        }));
-        return id;
-      },
-
-      updatePlayer: (id, updates) => set((s) => ({
-        players: s.players.map(p => p.id === id ? { ...p, ...updates } : p)
-      })),
-
-      deletePlayer: (id) => set((s) => ({
-        players: s.players.filter(p => p.id !== id),
-        matches: s.matches.filter(m => !m.playerIds.includes(id))
-      })),
-
-      addMatch: (matchData) => {
-        const id = uuid();
-        const match: MatchRecord = {
-          ...matchData,
-          id,
-          synced: false,
-          createdAt: new Date().toISOString(),
-        };
-        set((s) => ({
-          matches: [...s.matches, match],
-          pendingSyncQueue: [...s.pendingSyncQueue, id]
-        }));
-        // Check achievements after adding
-        setTimeout(() => get().checkAchievements(id), 100);
-        return id;
-      },
-
-      updateMatch: (id, updates) => set((s) => ({
-        matches: s.matches.map(m => m.id === id ? { ...m, ...updates, synced: false } : m)
-      })),
-
-      deleteMatch: (id) => set((s) => ({
-        matches: s.matches.filter(m => m.id !== id)
-      })),
-
-      setShowPlaySetup: (v) => set({ showPlaySetup: v }),
-      setShowMatchDetail: (id) => set({ showMatchDetail: id }),
-
-      addAchievement: (a) => set((s) => {
-        const exists = s.playerAchievements.find(
-          pa => pa.achievementId === a.achievementId && pa.playerId === a.playerId
+  deleteGame: (id) => {
+    set((s) => {
+      const game = s.games.find(g => g.id === id);
+      let games = s.games.filter(g => g.id !== id);
+      if (game?.isExpansion && game.baseGameId) {
+        games = games.map(g => g.id === game.baseGameId
+          ? { ...g, expansionIds: g.expansionIds.filter(eid => eid !== id) }
+          : g
         );
-        if (exists) return {};
-        return { playerAchievements: [...s.playerAchievements, a] };
-      }),
+      }
+      if (!game?.isExpansion) {
+        games = games.filter(g => g.baseGameId !== id);
+      }
+      const nextGames = games.map(g => ({ ...g }));
+      nextGames.forEach(g => saveGame(g).catch(e => console.error(e)));
+      deleteGameDb(id).catch(e => console.error('Error deleting game:', e));
+      return { games: nextGames, matches: s.matches.filter(m => m.gameId !== id) };
+    });
+  },
 
-      checkAchievements: (matchId) => {
-        const state = get();
-        const match = state.matches.find(m => m.id === matchId);
-        if (!match) return;
+  setSelectedGameId: (id) => set({ selectedGameId: id }),
+  setEditingGameId: (id) => set({ editingGameId: id }),
+  setShowGameForm: (v) => set({ showGameForm: v, editingGameId: v ? get().editingGameId : null }),
 
-        const game = state.games.find(g => g.id === match.gameId);
-        if (!match.winnerId) return;
+  addPlayer: (name, color) => {
+    const id = uuid();
+    const player: Player = {
+      id,
+      name: name.trim(),
+      color: color || PLAYER_COLORS[get().players.length % PLAYER_COLORS.length],
+      createdAt: new Date().toISOString(),
+    };
+    set((s) => ({ players: [...s.players, player] }));
+    savePlayer(player).then(() => get().refreshPendingSync()).catch(e => console.error('Error saving player:', e));
+    return id;
+  },
 
-        // Check each player
-        match.playerIds.forEach(playerId => {
-          const playerMatches = state.matches.filter(m => m.playerIds.includes(playerId));
-          const isWinner = match.winnerId === playerId;
+  updatePlayer: (id, updates) => {
+    set((s) => {
+      const players = s.players.map(p => p.id === id ? { ...p, ...updates } : p);
+      const updated = players.find(p => p.id === id);
+      if (updated) savePlayer(updated).catch(e => console.error('Error saving player:', e));
+      return { players };
+    });
+  },
 
-          // Racha de 3 - Win streak of 3
-          if (isWinner) {
-            const sortedMatches = [...playerMatches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            let streak = 0;
-            for (const m of sortedMatches) {
-              if (m.winnerId === playerId) streak++;
-              else break;
-            }
-            if (streak >= 3) {
-              state.addAchievement({
-                achievementId: 'racha_3',
-                playerId,
-                unlockedAt: new Date().toISOString(),
-                matchId
-              });
-            }
-          }
+  deletePlayer: (id) => {
+    set((s) => ({
+      players: s.players.filter(p => p.id !== id),
+      matches: s.matches.filter(m => !m.playerIds.includes(id)),
+    }));
+    deletePlayerDb(id).catch(e => console.error('Error deleting player:', e));
+  },
 
-          // Club de los 100
-          const playerScore = match.playerScores.find(ps => ps.playerId === playerId);
-          if (playerScore && playerScore.total >= 100) {
+  addMatch: (matchData) => {
+    const id = uuid();
+    const match: MatchRecord = {
+      ...matchData,
+      id,
+      synced: false,
+      createdAt: new Date().toISOString(),
+    };
+    set((s) => ({
+      matches: [...s.matches, match],
+    }));
+    saveMatch(match).then(() => {
+      get().refreshPendingSync();
+      setTimeout(() => get().checkAchievements(id), 50);
+    }).catch(e => console.error('Error saving match:', e));
+    return id;
+  },
+
+  updateMatch: (id, updates) => {
+    set((s) => {
+      const matches = s.matches.map(m => m.id === id ? { ...m, ...updates, synced: false } : m);
+      const updated = matches.find(m => m.id === id);
+      if (updated) saveMatch(updated).then(() => get().refreshPendingSync()).catch(e => console.error(e));
+      return { matches };
+    });
+  },
+
+  deleteMatch: (id) => {
+    set((s) => ({ matches: s.matches.filter(m => m.id !== id) }));
+    deleteMatchDb(id).then(() => get().refreshPendingSync()).catch(e => console.error('Error deleting match:', e));
+  },
+
+  setShowPlaySetup: (v) => set({ showPlaySetup: v }),
+  setShowMatchDetail: (id) => set({ showMatchDetail: id }),
+
+  addAchievement: (a) => {
+    set((s) => {
+      const exists = s.playerAchievements.find(
+        pa => pa.achievementId === a.achievementId && pa.playerId === a.playerId
+      );
+      if (exists) return {};
+      const achievement: PlayerAchievement = { ...a, unlockedAt: a.unlockedAt || new Date().toISOString() };
+      saveAchievement(achievement).catch(e => console.error('Error saving achievement:', e));
+      return { playerAchievements: [...s.playerAchievements, achievement] };
+    });
+  },
+
+  checkAchievements: (matchId) => {
+    const state = get();
+    const match = state.matches.find(m => m.id === matchId);
+    if (!match) return;
+
+    const game = state.games.find(g => g.id === match.gameId);
+    if (!match.winnerId) return;
+
+    match.playerIds.forEach(playerId => {
+      const playerMatches = state.matches.filter(m => m.playerIds.includes(playerId));
+      const isWinner = match.winnerId === playerId;
+
+      if (isWinner) {
+        const sortedMatches = [...playerMatches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        let streak = 0;
+        for (const m of sortedMatches) {
+          if (m.winnerId === playerId) streak++;
+          else break;
+        }
+        if (streak >= 3) {
+          state.addAchievement({
+            achievementId: 'racha_3',
+            playerId,
+            unlockedAt: new Date().toISOString(),
+            matchId
+          });
+        }
+      }
+
+      const playerScore = match.playerScores.find(ps => ps.playerId === playerId);
+      if (playerScore && playerScore.total >= 100) {
+        state.addAchievement({
+          achievementId: 'club_100',
+          playerId,
+          unlockedAt: new Date().toISOString(),
+          matchId
+        });
+      }
+
+      if (isWinner && game && (game.name.includes('7 Wonders'))) {
+        const militaryCat = game.scoringTemplate.categories.find(c => c.metadata === 'militar');
+        if (militaryCat && playerScore) {
+          const milScore = playerScore.scores[militaryCat.id] || 0;
+          if (milScore === 0) {
             state.addAchievement({
-              achievementId: 'club_100',
+              achievementId: 'pacificador',
               playerId,
               unlockedAt: new Date().toISOString(),
               matchId
             });
           }
-
-          // El Pacificador - Win 7 Wonders / 7WD with 0 military
-          if (isWinner && game && (game.name.includes('7 Wonders'))) {
-            const militaryCat = game.scoringTemplate.categories.find(c => c.metadata === 'militar');
-            if (militaryCat && playerScore) {
-              const milScore = playerScore.scores[militaryCat.id] || 0;
-              if (milScore === 0) {
-                state.addAchievement({
-                  achievementId: 'pacificador',
-                  playerId,
-                  unlockedAt: new Date().toISOString(),
-                  matchId
-                });
-              }
-            }
-          }
-        });
-      },
-
-      initializeDefaults: () => {
-        const state = get();
-        if (!state.initialized) {
-          set({ games: defaultGames, initialized: true });
         }
-      },
-    }),
-    {
-      name: 'gamy-storage',
+      }
+    });
+  },
+
+  initializeDefaults: async () => {
+    const state = get();
+    if (!state.initialized) {
+      const games = defaultGames.map(g => ({ ...g }));
+      set({ games, initialized: true });
+      await setInitialized(true);
+      await Promise.all(games.map(g => saveGame(g)));
     }
-  )
-);
+  },
+
+  loadFromLocalDb: async () => {
+    const loaded = await loadLocalState();
+    set({
+      games: loaded.games,
+      players: loaded.players,
+      matches: loaded.matches,
+      playerAchievements: loaded.playerAchievements,
+      initialized: loaded.initialized,
+      hydrated: true,
+    });
+    get().refreshPendingSync();
+  },
+
+  refreshPendingSync: async () => {
+    const queue = await getSyncQueue();
+    set({ pendingSyncQueue: queue.map(q => q.id) });
+  },
+
+  syncPendingItems: async () => {
+    const { matches, players, games, playerAchievements } = get();
+    const queue = await getSyncQueue();
+    for (const item of queue) {
+      let payload: unknown;
+      let type: 'game' | 'player' | 'match' | 'achievement' = item.type;
+      if (item.type === 'match') payload = matches.find(m => m.id === item.id.split(':')[1]);
+      else if (item.type === 'player') payload = players.find(p => p.id === item.id.split(':')[1]);
+      else if (item.type === 'game') payload = games.find(g => g.id === item.id.split(':')[1]);
+      else if (item.type === 'achievement') {
+        const [, achievementId, playerId] = item.id.split(':');
+        payload = playerAchievements.find(a => a.achievementId === achievementId && a.playerId === playerId);
+      }
+      if (!payload) {
+        await clearSyncItem(item.id);
+        continue;
+      }
+      const ok = await syncItemToRemote(type, payload);
+      if (ok) await clearSyncItem(item.id);
+    }
+    get().refreshPendingSync();
+  },
+
+  checkConnection: async () => {
+    const status = await checkRemoteConnection();
+    set({ dbStatus: status });
+  },
+}));
+
+// Cargar datos al iniciar la aplicación
+useStore.getState().loadFromLocalDb();

@@ -71,6 +71,6 @@ export interface PlayerAchievement {
   matchId?: string;
 }
 
-export type DbStatus = 'connected' | 'reconnecting' | 'disconnected';
+export type DbStatus = 'connected' | 'reconnecting' | 'disconnected' | 'local';
 
 export type ViewTab = 'library' | 'play' | 'history' | 'stats' | 'players';

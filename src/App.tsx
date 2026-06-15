@@ -9,18 +9,18 @@ import Stats from './components/Stats';
 
 const TABS = [
   { key: 'library' as const, label: 'Ludoteca', icon: '📚' },
-  { key: 'play' as const, label: 'Jugar', icon: '🎮' },
+  { key: 'play' as const, label: 'Jugar', icon: '🎲' },
   { key: 'history' as const, label: 'Historial', icon: '📋' },
   { key: 'stats' as const, label: 'Stats', icon: '📊' },
-  { key: 'players' as const, label: 'Jugadores', icon: '👥' },
+  { key: 'players' as const, label: 'Jugadores', icon: '👤' },
 ];
 
 export default function App() {
-  const { currentTab, setTab, initializeDefaults, matches } = useStore();
+  const { currentTab, setTab, initializeDefaults, loadFromLocalDb, matches } = useStore();
 
   useEffect(() => {
-    initializeDefaults();
-  }, [initializeDefaults]);
+    loadFromLocalDb().then(() => initializeDefaults());
+  }, [loadFromLocalDb, initializeDefaults]);
 
   const tabContent = () => {
     switch (currentTab) {
@@ -34,44 +34,61 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col overflow-x-hidden" style={{ maxWidth: '100vw' }}>
+    <div className="min-h-screen flex flex-col relative overflow-x-hidden">
+      <div className="ambient-glow" />
+
       {/* Header */}
-      <header className="bg-gray-900/95 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center font-black text-sm">
-            G
+      <header className="relative z-40 glass-card border-b-0 border-b border-[var(--border)] rounded-none px-4 py-3 flex items-center justify-between sticky top-0">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-violet-900/40">
+            <span className="font-black text-white text-lg tracking-tighter">G</span>
           </div>
           <div>
-            <h1 className="text-base font-bold leading-none tracking-tight">Gamy</h1>
-            <p className="text-[10px] text-gray-500 leading-none mt-0.5">Ludoteca</p>
+            <h1 className="text-lg font-extrabold leading-none tracking-tight text-white">Gamy</h1>
+            <p className="text-[11px] text-[var(--text-muted)] leading-none mt-1">Tu ludoteca</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500">{matches.length} partidas</span>
+          <span className="text-xs font-medium text-[var(--text-secondary)] bg-slate-800/60 px-2.5 py-1 rounded-full border border-[var(--border)]">
+            {matches.length} partidas
+          </span>
           <DbIndicator />
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 px-4 py-4 pb-24 overflow-y-auto overflow-x-hidden">
-        {tabContent()}
+      <main className="relative z-10 flex-1 px-4 py-5 pb-28 overflow-y-auto overflow-x-hidden">
+        <div className="max-w-3xl mx-auto animate-fade-in">
+          {tabContent()}
+        </div>
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-md border-t border-gray-800 px-2 pb-[env(safe-area-inset-bottom)] z-40">
-        <div className="flex justify-around items-center max-w-lg mx-auto">
-          {TABS.map(tab => (
-            <button key={tab.key} onClick={() => setTab(tab.key)}
-              className={`flex flex-col items-center py-2.5 px-3 min-w-0 transition-all ${
-                currentTab === tab.key ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300'
-              }`}>
-              <span className="text-lg leading-none mb-0.5">{tab.icon}</span>
-              <span className="text-[10px] font-medium leading-none">{tab.label}</span>
-              {currentTab === tab.key && (
-                <div className="w-1 h-1 rounded-full bg-purple-400 mt-1" />
-              )}
-            </button>
-          ))}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-[env(safe-area-inset-bottom)]">
+        <div className="glass-card mx-auto max-w-md mb-3 px-2 py-2">
+          <div className="flex justify-around items-center">
+            {TABS.map(tab => {
+              const active = currentTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setTab(tab.key)}
+                  className={`relative flex flex-col items-center py-2 px-2 min-w-[3.5rem] rounded-xl transition-all ${
+                    active ? 'text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                  }`}
+                >
+                  {active && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-violet-600/25 to-transparent rounded-xl" />
+                  )}
+                  <span className="text-lg leading-none mb-1 relative z-10">{tab.icon}</span>
+                  <span className="text-[10px] font-semibold leading-none relative z-10">{tab.label}</span>
+                  {active && (
+                    <div className="absolute -bottom-0.5 w-5 h-1 rounded-full bg-gradient-to-r from-violet-400 to-cyan-400" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </nav>
     </div>

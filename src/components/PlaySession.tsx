@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { PlayerScore, ScoreCategory } from '../types';
 
-type PlayStep = 'selectGame' | 'selectPlayers' | 'configure' | 'scoring' | 'results';
+type PlayStep = 'selectGame' | 'selectPlayers' | 'configure' | 'scoring';
 
 const GAME_EMOJIS: Record<string, string> = {
   'Estrategia': '♟️', 'Cartas': '🃏', 'Filler': '⚡', 'Cooperativo': '🤝',
@@ -10,20 +10,24 @@ const GAME_EMOJIS: Record<string, string> = {
   'Destreza': '🎯', 'Familiar': '👨‍👩‍👧‍👦', 'Abstracto': '🔷', 'Duel': '⚔️',
 };
 
-const GAME_GRADIENTS: Record<string, string> = {
-  'Estrategia': 'from-blue-900/80 to-indigo-800/60',
-  'Cartas': 'from-red-900/80 to-rose-800/60',
-  'Filler': 'from-green-900/80 to-emerald-800/60',
-  'Cooperativo': 'from-teal-900/80 to-cyan-800/60',
-  'Dados': 'from-orange-900/80 to-amber-800/60',
-  'Puzzle': 'from-purple-900/80 to-violet-800/60',
-  'Construcción': 'from-yellow-900/80 to-amber-800/60',
-  'Negociación': 'from-pink-900/80 to-fuchsia-800/60',
-  'Destreza': 'from-lime-900/80 to-green-800/60',
-  'Familiar': 'from-sky-900/80 to-blue-800/60',
-  'Abstracto': 'from-gray-800/80 to-slate-700/60',
-  'Duel': 'from-red-900/80 to-orange-800/60',
-};
+function typeGradient(type: string) {
+  const key = type.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return `type-gradient-${key}`;
+}
+
+function StepHeader({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack?: () => void }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      {onBack && (
+        <button onClick={onBack} className="btn btn-secondary px-3 py-2 text-sm">← Atrás</button>
+      )}
+      <div>
+        <h2 className="text-2xl font-extrabold text-white">{title}</h2>
+        {subtitle && <p className="text-sm text-[var(--text-secondary)]">{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
 
 export default function PlaySession() {
   const { games, players, addMatch, setTab } = useStore();
@@ -45,7 +49,6 @@ export default function PlaySession() {
     g.name.toLowerCase().includes(gameSearch.toLowerCase())
   );
 
-  // Build complete scoring categories including active expansions
   const allCategories = useMemo(() => {
     if (!selectedGame) return [];
     let cats = [...selectedGame.scoringTemplate.categories];
@@ -56,7 +59,6 @@ export default function PlaySession() {
     return cats;
   }, [selectedGame, activeExpansionIds, games]);
 
-  // Collect all special victory types
   const allSpecialVictoryTypes = useMemo(() => {
     if (!selectedGame) return [];
     let types = [...(selectedGame.specialVictoryTypes || [])];
@@ -153,46 +155,40 @@ export default function PlaySession() {
   // Step: Select Game
   if (step === 'selectGame') {
     return (
-      <div className="space-y-3">
-        <h2 className="text-lg font-bold text-white">¿A qué jugamos?</h2>
-        
-        {/* Search bar */}
+      <div className="space-y-4">
+        <StepHeader title="¿A qué jugamos?" subtitle="Elige un juego de tu ludoteca" />
+
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-          <input
-            value={gameSearch}
-            onChange={e => setGameSearch(e.target.value)}
-            placeholder="Buscar juego..."
-            className="w-full bg-gray-800 text-white rounded-xl pl-9 pr-10 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-          />
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm">🔍</span>
+          <input value={gameSearch} onChange={e => setGameSearch(e.target.value)} placeholder="Buscar juego..."
+            className="input-field pl-10" />
           {gameSearch && (
-            <button onClick={() => setGameSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-sm">
-              ✕
-            </button>
+            <button onClick={() => setGameSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-white">✕</button>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           {filteredBaseGames.map(game => {
-            const gradient = GAME_GRADIENTS[game.types[0]] || 'from-gray-800 to-gray-700';
             const emoji = GAME_EMOJIS[game.types[0]] || '🎲';
             return (
               <button key={game.id} onClick={() => { setSelectedGameId(game.id); setStep('selectPlayers'); }}
-                className="bg-gray-800 rounded-xl overflow-hidden text-left hover:ring-2 hover:ring-purple-500 transition-all group">
-                <div className={`h-24 bg-gradient-to-br ${gradient} flex items-center justify-center overflow-hidden relative`}>
+                className="glass-card overflow-hidden text-left hover:ring-2 hover:ring-violet-500/50 transition-all group animate-slide-up">
+                <div className={`h-28 relative overflow-hidden ${typeGradient(game.types[0])}`}>
                   {game.imageUrl ? (
-                    <img src={game.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    <img src={game.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
-                    <span className="text-3xl opacity-40">{emoji}</span>
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-4xl opacity-40">{emoji}</span>
+                    </div>
                   )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 to-transparent" />
                 </div>
-                <div className="p-2.5">
-                  <h3 className="text-white text-sm font-semibold leading-tight line-clamp-2">{game.name}</h3>
-                  <div className="flex flex-wrap gap-1 mt-1">
+                <div className="p-3">
+                  <h3 className="text-white text-sm font-bold leading-tight line-clamp-2">{game.name}</h3>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
                     {game.types.slice(0, 2).map(t => (
-                      <span key={t} className="text-[9px] bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">{t}</span>
+                      <span key={t} className="text-[9px] bg-slate-700/60 text-slate-300 px-1.5 py-0.5 rounded">{t}</span>
                     ))}
                   </div>
                 </div>
@@ -202,9 +198,9 @@ export default function PlaySession() {
         </div>
 
         {filteredBaseGames.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            <p className="text-3xl mb-2">🔍</p>
-            <p className="text-sm">No se encontraron juegos con "{gameSearch}"</p>
+          <div className="text-center py-16 glass-card">
+            <p className="text-5xl mb-4">🔍</p>
+            <p className="text-[var(--text-secondary)] font-medium">No se encontraron juegos con "{gameSearch}"</p>
           </div>
         )}
       </div>
@@ -215,110 +211,116 @@ export default function PlaySession() {
   if (step === 'selectPlayers') {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <button onClick={() => setStep('selectGame')} className="text-gray-400 hover:text-white">← Atrás</button>
-          <h2 className="text-lg font-bold text-white">Jugadores</h2>
-          <div className="w-12" />
-        </div>
+        <StepHeader title="Jugadores" subtitle="Selecciona quién juega" onBack={() => setStep('selectGame')} />
 
-        <div className="bg-gray-800/50 rounded-xl p-3 flex items-center gap-3">
+        <div className="glass-card p-3 flex items-center gap-3">
           {selectedGame?.imageUrl ? (
-            <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+            <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0">
               <img src={selectedGame.imageUrl} alt="" className="w-full h-full object-cover" />
             </div>
           ) : (
-            <div className="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center shrink-0">
-              <span className="text-lg">{GAME_EMOJIS[selectedGame?.types[0] || ''] || '🎲'}</span>
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${typeGradient(selectedGame?.types[0] || '')}`}>
+              <span className="text-xl">{GAME_EMOJIS[selectedGame?.types[0] || ''] || '🎲'}</span>
             </div>
           )}
-          <span className="text-sm text-white font-semibold">{selectedGame?.name}</span>
+          <div>
+            <p className="text-sm text-white font-bold">{selectedGame?.name}</p>
+            <p className="text-xs text-[var(--text-secondary)]">{selectedGame?.types.join(' • ')}</p>
+          </div>
         </div>
 
         <div className="space-y-2">
           {players.map(player => (
             <button key={player.id} onClick={() => togglePlayer(player.id)}
-              className={`w-full flex items-center gap-3 p-4 rounded-xl transition-all ${
-                selectedPlayerIds.includes(player.id) ? 'bg-purple-600/20 ring-2 ring-purple-500' : 'bg-gray-800 hover:bg-gray-700'
+              className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all border ${
+                selectedPlayerIds.includes(player.id)
+                  ? 'bg-violet-600/15 border-violet-500/50 ring-1 ring-violet-500/30'
+                  : 'bg-slate-800/40 border-[var(--border)] hover:bg-slate-800/70'
               }`}>
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+              <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold shadow-md"
                 style={{ backgroundColor: player.color }}>
                 {player.name.charAt(0).toUpperCase()}
               </div>
-              <span className="text-white font-medium flex-1 text-left">{player.name}</span>
-              {selectedPlayerIds.includes(player.id) && <span className="text-purple-400 text-xl">✓</span>}
+              <span className="text-white font-semibold flex-1 text-left">{player.name}</span>
+              {selectedPlayerIds.includes(player.id) && (
+                <span className="w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs">✓</span>
+              )}
             </button>
           ))}
         </div>
 
         {players.length === 0 && (
-          <p className="text-center text-gray-500 text-sm py-8">Añade jugadores primero en la pestaña Jugadores</p>
+          <div className="text-center py-12 glass-card">
+            <p className="text-4xl mb-3">👤</p>
+            <p className="text-[var(--text-secondary)]">Añade jugadores primero en la pestaña Jugadores</p>
+          </div>
         )}
 
         {selectedPlayerIds.length >= 1 && (
           <button onClick={() => setStep('configure')}
-            className="w-full bg-purple-600 text-white rounded-xl py-3.5 font-semibold text-base hover:bg-purple-500 transition-colors">
-            Continuar ({selectedPlayerIds.length} jugadores)
+            className="w-full btn btn-primary py-3.5 text-base shadow-lg shadow-violet-900/40">
+            Continuar con {selectedPlayerIds.length} jugadores
           </button>
         )}
       </div>
     );
   }
 
-  // Step: Configure (expansions + first player)
+  // Step: Configure
   if (step === 'configure') {
     const selectedPlayers = players.filter(p => selectedPlayerIds.includes(p.id));
     const firstPlayer = players.find(p => p.id === firstPlayerId);
 
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <button onClick={() => setStep('selectPlayers')} className="text-gray-400 hover:text-white">← Atrás</button>
-          <h2 className="text-lg font-bold text-white">Configurar Partida</h2>
-          <div className="w-12" />
-        </div>
+        <StepHeader title="Configurar partida" subtitle="Expansiones y jugador inicial" onBack={() => setStep('selectPlayers')} />
 
-        {/* Expansions */}
         {expansions.length > 0 && (
-          <div className="bg-gray-800 rounded-xl p-4">
-            <h3 className="text-white font-semibold mb-3">📦 Expansiones</h3>
+          <div className="glass-card p-4">
+            <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+              <span>📦</span> Expansiones
+            </h3>
             <div className="space-y-2">
               {expansions.map(exp => (
                 <button key={exp.id} onClick={() => toggleExpansion(exp.id)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
-                    activeExpansionIds.includes(exp.id) ? 'bg-purple-600/20 ring-1 ring-purple-500' : 'bg-gray-700/50 hover:bg-gray-700'
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${
+                    activeExpansionIds.includes(exp.id)
+                      ? 'bg-violet-600/15 border-violet-500/50'
+                      : 'bg-slate-800/40 border-[var(--border)] hover:bg-slate-800/70'
                   }`}>
                   <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                    activeExpansionIds.includes(exp.id) ? 'bg-purple-600 border-purple-600' : 'border-gray-500'
+                    activeExpansionIds.includes(exp.id) ? 'bg-violet-600 border-violet-600' : 'border-slate-500'
                   }`}>
                     {activeExpansionIds.includes(exp.id) && <span className="text-white text-xs">✓</span>}
                   </div>
-                  <span className="text-sm text-white">{exp.name}</span>
+                  <span className="text-sm text-white font-medium">{exp.name}</span>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* First player randomizer */}
-        <div className="bg-gray-800 rounded-xl p-4">
-          <h3 className="text-white font-semibold mb-3">🎯 Jugador Inicial</h3>
+        <div className="glass-card p-4">
+          <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+            <span>🎯</span> Jugador inicial
+          </h3>
           <button onClick={randomFirstPlayer}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl py-4 font-bold text-base hover:from-purple-500 hover:to-pink-500 transition-all active:scale-95 transform">
-            🎲 ¡Sortear!
+            className="w-full btn btn-primary bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 py-3.5 text-base shadow-lg shadow-violet-900/30">
+            🎲 Sortear jugador inicial
           </button>
           {firstPlayer && (
-            <div className="mt-3 text-center">
-              <div className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-400 px-4 py-2 rounded-full">
+            <div className="mt-4 text-center">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 px-5 py-2.5 rounded-full border border-amber-500/30">
                 <span className="text-lg">👑</span>
-                <span className="font-semibold">{firstPlayer.name} empieza</span>
+                <span className="font-bold">{firstPlayer.name} empieza</span>
               </div>
             </div>
           )}
-          <div className="flex gap-2 mt-3 flex-wrap justify-center">
+          <div className="flex gap-2 mt-4 flex-wrap justify-center">
             {selectedPlayers.map(p => (
               <button key={p.id} onClick={() => setFirstPlayerId(p.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  firstPlayerId === p.id ? 'ring-2 ring-amber-400 text-white' : 'bg-gray-700 text-gray-400'
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                  firstPlayerId === p.id ? 'text-white border-transparent' : 'bg-slate-800/60 text-[var(--text-secondary)] border-[var(--border)]'
                 }`} style={firstPlayerId === p.id ? { backgroundColor: p.color } : {}}>
                 {p.name}
               </button>
@@ -327,8 +329,8 @@ export default function PlaySession() {
         </div>
 
         <button onClick={() => setStep('scoring')}
-          className="w-full bg-purple-600 text-white rounded-xl py-3.5 font-semibold text-base hover:bg-purple-500 transition-colors">
-          Empezar Partida 🚀
+          className="w-full btn btn-primary py-3.5 text-base shadow-lg shadow-violet-900/40">
+          Empezar partida 🚀
         </button>
       </div>
     );
@@ -341,44 +343,35 @@ export default function PlaySession() {
 
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <button onClick={() => setStep('configure')} className="text-gray-400 hover:text-white">← Atrás</button>
-          <h2 className="text-lg font-bold text-white">Puntuación</h2>
-          <div className="w-12" />
-        </div>
+        <StepHeader title="Puntuación" subtitle="Introduce los resultados" onBack={() => setStep('configure')} />
 
-        <div className="bg-gray-800/50 rounded-xl p-3 flex items-center gap-3">
+        <div className="glass-card p-3 flex items-center gap-3">
           {selectedGame?.imageUrl ? (
-            <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
+            <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
               <img src={selectedGame.imageUrl} alt="" className="w-full h-full object-cover" />
             </div>
           ) : null}
           <div>
-            <span className="text-sm text-white font-semibold">{selectedGame?.name}</span>
+            <span className="text-sm text-white font-bold">{selectedGame?.name}</span>
             {activeExpansionIds.length > 0 && (
-              <span className="text-xs text-purple-400 block">
+              <span className="text-xs text-violet-300 block">
                 + {activeExpansionIds.map(id => games.find(g => g.id === id)?.name).join(', ')}
               </span>
             )}
           </div>
         </div>
 
-        {/* Special Victory buttons */}
         {hasSpecialVictory && allSpecialVictoryTypes.length > 0 && (
-          <div className="bg-amber-900/20 rounded-xl p-4">
-            <h3 className="text-amber-400 font-semibold text-sm mb-3">⚡ Victoria Especial</h3>
-            <p className="text-xs text-gray-400 mb-3">Si alguien ganó por una condición especial, selecciona al jugador y el tipo de victoria. No será necesario introducir puntos.</p>
+          <div className="glass-card p-4 border-amber-500/20 bg-amber-500/5">
+            <h3 className="text-amber-400 font-bold text-sm mb-2 flex items-center gap-2"><span>⚡</span> Victoria especial</h3>
+            <p className="text-xs text-[var(--text-secondary)] mb-3">Si alguien ganó por una condición especial, selecciónalo. No será necesario introducir puntos.</p>
             {selectedPlayers.map(player => (
-              <div key={player.id} className="mb-2">
-                <p className="text-xs text-gray-300 mb-1.5">{player.name}:</p>
+              <div key={player.id} className="mb-3">
+                <p className="text-xs text-white font-semibold mb-1.5">{player.name}</p>
                 <div className="flex gap-1.5 flex-wrap">
                   {allSpecialVictoryTypes.map(svt => (
                     <button key={svt} onClick={() => setSpecialVictory(player.id, svt)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        specialVictories[player.id] === svt
-                          ? 'bg-amber-500 text-white'
-                          : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-                      }`}>
+                      className={`chip ${specialVictories[player.id] === svt ? 'bg-amber-500 text-white border-transparent' : ''}`}>
                       {svt}
                     </button>
                   ))}
@@ -388,33 +381,32 @@ export default function PlaySession() {
           </div>
         )}
 
-        {/* Score inputs */}
         {!hasAnySpecialVictory && (
           <div className="space-y-3">
             {selectedPlayers.map(player => (
-              <div key={player.id} className="bg-gray-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
+              <div key={player.id} className="glass-card p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md"
                     style={{ backgroundColor: player.color }}>
                     {player.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-white font-semibold text-sm">{player.name}</span>
-                  <span className="ml-auto text-lg font-bold text-purple-400">{getPlayerTotal(player.id)}</span>
+                  <span className="text-white font-bold text-sm">{player.name}</span>
+                  <span className="ml-auto text-xl font-black text-violet-300">{getPlayerTotal(player.id)}</span>
                 </div>
 
                 {isSimple ? (
                   <input type="number" inputMode="numeric" value={playerScores[player.id]?.['total'] ?? ''}
                     onChange={e => updateScore(player.id, 'total', parseInt(e.target.value) || 0)}
                     placeholder="Puntuación total"
-                    className="w-full bg-gray-700 text-white text-center rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 text-lg font-semibold" />
+                    className="input-field text-center text-lg font-bold py-3" />
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {allCategories.map((cat: ScoreCategory) => (
                       <div key={cat.id}>
-                        <label className="text-[10px] text-gray-400 mb-0.5 block truncate">{cat.name}</label>
+                        <label className="text-[10px] font-semibold text-[var(--text-muted)] mb-0.5 block truncate">{cat.name}</label>
                         <input type="number" inputMode="numeric" value={playerScores[player.id]?.[cat.id] ?? ''}
                           onChange={e => updateScore(player.id, cat.id, parseInt(e.target.value) || 0)}
-                          className="w-full bg-gray-700 text-white text-center rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium" />
+                          className="input-field text-center text-sm py-2" />
                       </div>
                     ))}
                   </div>
@@ -424,18 +416,13 @@ export default function PlaySession() {
           </div>
         )}
 
-        {/* Manual winner selection if special victory is not used */}
         {!hasAnySpecialVictory && (
-          <div className="bg-gray-800 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-400 mb-2">Ganador (auto o manual)</h3>
+          <div className="glass-card p-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">Ganador</h3>
             <div className="flex gap-2 flex-wrap">
               {selectedPlayers.map(p => (
                 <button key={p.id} onClick={() => setWinnerId(winnerId === p.id ? '' : p.id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    (winnerId || determineWinner()) === p.id
-                      ? 'bg-amber-500 text-white'
-                      : 'bg-gray-700 text-gray-400'
-                  }`}>
+                  className={`chip ${(winnerId || determineWinner()) === p.id ? 'bg-amber-500 text-white border-transparent' : ''}`}>
                   👑 {p.name} ({getPlayerTotal(p.id)})
                 </button>
               ))}
@@ -444,8 +431,8 @@ export default function PlaySession() {
         )}
 
         <button onClick={handleFinish}
-          className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl py-3.5 font-semibold text-base hover:from-green-500 hover:to-emerald-500 transition-all">
-          ✅ Guardar Partida
+          className="w-full btn btn-success py-3.5 text-base shadow-lg shadow-emerald-900/30">
+          ✅ Guardar partida
         </button>
       </div>
     );
