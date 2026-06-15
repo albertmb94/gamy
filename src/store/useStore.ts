@@ -364,8 +364,8 @@ export const useStore = create<AppState>()((set, get) => ({
             set((s) => ({
               matches: s.matches.map(m => m.id === matchId ? { ...m, synced: true } : m),
             }));
-            const updatedMatch = get().matches.find(m => m.id === matchId);
-            if (updatedMatch) await saveMatch(updatedMatch);
+          const updatedMatch = get().matches.find(m => m.id === matchId);
+          if (updatedMatch) await saveMatch(updatedMatch, true);
           }
         }
       } catch (e) {

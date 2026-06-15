@@ -121,10 +121,12 @@ export async function deletePlayer(id: string) {
   await db.put('syncQueue', { id: `player-del:${id}`, type: 'player', updatedAt: new Date().toISOString() });
 }
 
-export async function saveMatch(match: MatchRecord) {
+export async function saveMatch(match: MatchRecord, skipSync = false) {
   const db = await getDb();
   await db.put('matches', match);
-  await db.put('syncQueue', { id: `match:${match.id}`, type: 'match', updatedAt: new Date().toISOString() });
+  if (!skipSync) {
+    await db.put('syncQueue', { id: `match:${match.id}`, type: 'match', updatedAt: new Date().toISOString() });
+  }
 }
 
 export async function deleteMatch(id: string) {
