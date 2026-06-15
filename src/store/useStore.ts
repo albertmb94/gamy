@@ -324,33 +324,39 @@ export const useStore = create<AppState>()((set, get) => ({
   syncPendingItems: async () => {
     const { matches, players, games, playerAchievements } = get();
     const queue = await getSyncQueue();
-    for (const item of queue) {
-      let payload: unknown;
+
+    // Ordenar: primero deletes, luego inserts/updates, y dentro de cada grupo por fecha
+    const sortedQueue = [...queue].sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+
+    for (const item of sortedQueue) {
+      let payload: unknown = null;
       let type: 'game' | 'player' | 'match' | 'achievement' = item.type;
+      let isDelete = false;
       let matchId: string | undefined;
 
+      // Formato de id: tipo:id (insert/update) o tipo-del:id (delete)
+      const idParts = item.id.split(':');
+      const baseType = idParts[0]; // ej: 'match' o 'match-del'
+      const realId = idParts.slice(1).join(':'); // por si el UUID contuviera ':'
+      isDelete = baseType.endsWith('-del');
+
       if (item.type === 'match') {
-        matchId = item.id.split(':')[1];
-        payload = matches.find(m => m.id === matchId);
+        matchId = realId;
+        payload = matches.find(m => m.id === matchId) ?? { id: matchId };
       } else if (item.type === 'player') {
-        payload = players.find(p => p.id === item.id.split(':')[1]);
+        payload = players.find(p => p.id === realId) ?? { id: realId };
       } else if (item.type === 'game') {
-        payload = games.find(g => g.id === item.id.split(':')[1]);
+        payload = games.find(g => g.id === realId) ?? { id: realId };
       } else if (item.type === 'achievement') {
         const [, achievementId, playerId] = item.id.split(':');
-        payload = playerAchievements.find(a => a.achievementId === achievementId && a.playerId === playerId);
+        payload = playerAchievements.find(a => a.achievementId === achievementId && a.playerId === playerId) ?? { achievementId, playerId };
       }
 
-      if (!payload) {
-        await clearSyncItem(item.id);
-        continue;
-      }
-
-      const ok = await syncItemToRemote(type, payload);
+      const ok = await syncItemToRemote(type, payload, isDelete);
       if (ok) {
         await clearSyncItem(item.id);
-        // Marcar la partida como sincronizada
-        if (type === 'match' && matchId) {
+        // Marcar la partida como sincronizada si era un insert/update
+        if (type === 'match' && matchId && !isDelete) {
           set((s) => ({
             matches: s.matches.map(m => m.id === matchId ? { ...m, synced: true } : m),
           }));

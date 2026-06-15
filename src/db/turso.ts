@@ -158,7 +158,8 @@ export function startDbMonitor(cb: (status: ExtendedDbStatus) => void) {
 
 export async function syncItemToRemote(
   type: 'game' | 'player' | 'match' | 'achievement',
-  payload: unknown
+  payload: unknown,
+  isDelete = false
 ): Promise<boolean> {
   // 1. Intentar sincronización directa con Turso
   const client = getTursoClient();
@@ -166,6 +167,20 @@ export async function syncItemToRemote(
     try {
       await ensureSchema();
       const p = payload as Record<string, unknown>;
+
+      if (isDelete) {
+        if (type === 'game') await client.execute({ sql: 'DELETE FROM games WHERE id = ?', args: [p.id] });
+        else if (type === 'player') await client.execute({ sql: 'DELETE FROM players WHERE id = ?', args: [p.id] });
+        else if (type === 'match') await client.execute({ sql: 'DELETE FROM matches WHERE id = ?', args: [p.id] });
+        else if (type === 'achievement') {
+          await client.execute({
+            sql: 'DELETE FROM player_achievements WHERE achievement_id = ? AND player_id = ?',
+            args: [p.achievementId, p.playerId],
+          });
+        }
+        return true;
+      }
+
       if (type === 'game') {
         const game = p as any;
         await client.execute({
