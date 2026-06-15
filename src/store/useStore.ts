@@ -324,6 +324,7 @@ export const useStore = create<AppState>()((set, get) => ({
   syncPendingItems: async () => {
     const { matches, players, games, playerAchievements } = get();
     const queue = await getSyncQueue();
+    console.log('[syncPendingItems] full queue:', queue.map(q => ({ id: q.id, type: q.type, updatedAt: q.updatedAt })));
 
     // Ordenar: primero deletes, luego inserts/updates, y dentro de cada grupo por fecha
     const sortedQueue = [...queue].sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
@@ -367,6 +368,8 @@ export const useStore = create<AppState>()((set, get) => ({
         }
       }
     }
+    const remaining = await getSyncQueue();
+    console.log('[syncPendingItems] remaining after sync:', remaining.map(q => q.id));
     get().refreshPendingSync();
   },
 
