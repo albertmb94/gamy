@@ -97,10 +97,12 @@ export async function loadLocalState(): Promise<{
   }
 }
 
-export async function saveGame(game: Game) {
+export async function saveGame(game: Game, skipSync = false) {
   const db = await getDb();
   await db.put('games', game);
-  await db.put('syncQueue', { id: `game:${game.id}`, type: 'game', updatedAt: new Date().toISOString() });
+  if (!skipSync) {
+    await db.put('syncQueue', { id: `game:${game.id}`, type: 'game', updatedAt: new Date().toISOString() });
+  }
 }
 
 export async function deleteGame(id: string) {
@@ -109,10 +111,12 @@ export async function deleteGame(id: string) {
   await db.put('syncQueue', { id: `game-del:${id}`, type: 'game', updatedAt: new Date().toISOString() });
 }
 
-export async function savePlayer(player: Player) {
+export async function savePlayer(player: Player, skipSync = false) {
   const db = await getDb();
   await db.put('players', player);
-  await db.put('syncQueue', { id: `player:${player.id}`, type: 'player', updatedAt: new Date().toISOString() });
+  if (!skipSync) {
+    await db.put('syncQueue', { id: `player:${player.id}`, type: 'player', updatedAt: new Date().toISOString() });
+  }
 }
 
 export async function deletePlayer(id: string) {
@@ -135,19 +139,16 @@ export async function deleteMatch(id: string) {
   await db.put('syncQueue', { id: `match-del:${id}`, type: 'match', updatedAt: new Date().toISOString() });
 }
 
-export async function saveAchievement(achievement: PlayerAchievement) {
+export async function saveAchievement(achievement: PlayerAchievement, skipSync = false) {
   const db = await getDb();
   await db.put('achievements', achievement);
-  await db.put('syncQueue', {
-    id: `ach:${achievement.achievementId}:${achievement.playerId}`,
-    type: 'achievement',
-    updatedAt: new Date().toISOString(),
-  });
-}
-
-export async function setInitialized(value: boolean) {
-  const db = await getDb();
-  await db.put('meta', value, 'initialized');
+  if (!skipSync) {
+    await db.put('syncQueue', {
+      id: `ach:${achievement.achievementId}:${achievement.playerId}`,
+      type: 'achievement',
+      updatedAt: new Date().toISOString(),
+    });
+  }
 }
 
 export async function getSyncQueue(): Promise<{ id: string; type: 'match' | 'player' | 'game' | 'achievement'; updatedAt: string }[]> {

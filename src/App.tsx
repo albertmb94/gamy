@@ -16,11 +16,11 @@ const TABS = [
 ];
 
 export default function App() {
-  const { currentTab, setTab, initializeDefaults, loadFromLocalDb, matches } = useStore();
+  const { currentTab, setTab, loadFromLocalDb, matches } = useStore();
 
   useEffect(() => {
-    loadFromLocalDb().then(() => initializeDefaults());
-  }, [loadFromLocalDb, initializeDefaults]);
+    loadFromLocalDb();
+  }, [loadFromLocalDb]);
 
   const tabContent = () => {
     switch (currentTab) {
