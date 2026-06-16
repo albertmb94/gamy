@@ -43,6 +43,7 @@ interface AppState {
   addGame: (game: Omit<Game, 'id' | 'createdAt' | 'expansionIds'> & { expansionIds?: string[] }) => string;
   updateGame: (id: string, updates: Partial<Game>) => void;
   deleteGame: (id: string) => void;
+  toggleFavorite: (id: string) => void;
   setSelectedGameId: (id: string | null) => void;
   setEditingGameId: (id: string | null) => void;
   setShowGameForm: (v: boolean) => void;
@@ -190,6 +191,15 @@ export const useStore = create<AppState>()((set, get) => ({
   setSelectedGameId: (id) => set({ selectedGameId: id }),
   setEditingGameId: (id) => set({ editingGameId: id }),
   setShowGameForm: (v) => set({ showGameForm: v, editingGameId: v ? get().editingGameId : null }),
+
+  toggleFavorite: (id) => {
+    set((s) => {
+      const games = s.games.map(g => g.id === id ? { ...g, isFavorite: !g.isFavorite } : g);
+      const updated = games.find(g => g.id === id);
+      if (updated) saveGame(updated).catch(e => console.error('Error saving game:', e));
+      return { games };
+    });
+  },
 
   addPlayer: (name, color) => {
     const incomingName = normName(name);

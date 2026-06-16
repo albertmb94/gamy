@@ -75,6 +75,7 @@ export async function ensureSchema(): Promise<boolean> {
         special_victory_types TEXT,
         difficulty INTEGER,
         duration INTEGER,
+        is_favorite INTEGER DEFAULT 0,
         created_at TEXT
       );`,
       `CREATE TABLE IF NOT EXISTS players (
@@ -104,6 +105,12 @@ export async function ensureSchema(): Promise<boolean> {
         PRIMARY KEY (achievement_id, player_id)
       );`,
     ], 'write');
+    // Migración: añadir columna is_favorite si la tabla ya existía sin ella.
+    try {
+      await client.execute('ALTER TABLE games ADD COLUMN is_favorite INTEGER DEFAULT 0');
+    } catch {
+      // La columna ya existe, ignorar.
+    }
     return true;
   } catch (e) {
     console.error('Error ensuring Turso schema:', e);
@@ -185,8 +192,8 @@ export async function syncItemToRemote(
         const game = p as any;
         await client.execute({
           sql: `INSERT OR REPLACE INTO games
-            (id, name, image_url, types, is_expansion, base_game_id, expansion_ids, scoring_template, allow_special_victory, special_victory_types, difficulty, duration, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, name, image_url, types, is_expansion, base_game_id, expansion_ids, scoring_template, allow_special_victory, special_victory_types, difficulty, duration, is_favorite, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           args: [
             game.id,
             game.name,
@@ -200,6 +207,7 @@ export async function syncItemToRemote(
             JSON.stringify(game.specialVictoryTypes ?? []),
             game.difficulty ?? null,
             game.duration ?? null,
+            game.isFavorite ? 1 : 0,
             game.createdAt,
           ],
         });
@@ -301,6 +309,7 @@ export async function fetchRemoteState(): Promise<{
       specialVictoryTypes: safeJson<string[]>(row.special_victory_types, []),
       difficulty: row.difficulty ?? undefined,
       duration: row.duration ?? undefined,
+      isFavorite: Boolean(row.is_favorite),
       createdAt: row.created_at,
     }));
 

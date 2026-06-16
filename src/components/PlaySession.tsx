@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { PlayerScore, ScoreCategory } from '../types';
+import { Game, PlayerScore, ScoreCategory } from '../types';
 
 type PlayStep = 'selectGame' | 'selectPlayers' | 'configure' | 'scoring';
 
@@ -40,14 +40,27 @@ export default function PlaySession() {
   const [specialVictories, setSpecialVictories] = useState<Record<string, string>>({});
   const [winnerId, setWinnerId] = useState('');
   const [gameSearch, setGameSearch] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<'name-asc' | 'duration-asc' | 'duration-desc' | 'favorites'>('favorites');
 
   const selectedGame = games.find(g => g.id === selectedGameId);
   const expansions = games.filter(g => g.baseGameId === selectedGameId);
   const baseGames = games.filter(g => !g.isExpansion);
 
-  const filteredBaseGames = baseGames.filter(g =>
-    g.name.toLowerCase().includes(gameSearch.toLowerCase())
-  );
+  const filteredBaseGames = baseGames.filter(g => {
+    const matchSearch = g.name.toLowerCase().includes(gameSearch.toLowerCase());
+    const matchFavorite = !favoritesOnly || !!g.isFavorite;
+    return matchSearch && matchFavorite;
+  });
+  const sortedBaseGames = [...filteredBaseGames].sort((a, b) => {
+    switch (sortBy) {
+      case 'name-asc': return a.name.localeCompare(b.name, 'es');
+      case 'duration-asc': return (a.duration ?? Infinity) - (b.duration ?? Infinity);
+      case 'duration-desc': return (b.duration ?? 0) - (a.duration ?? 0);
+      case 'favorites':
+        return (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0) || a.name.localeCompare(b.name, 'es');
+    }
+  });
 
   const allCategories = useMemo(() => {
     if (!selectedGame) return [];
@@ -149,6 +162,7 @@ export default function PlaySession() {
     setSpecialVictories({});
     setWinnerId('');
     setGameSearch('');
+    setFavoritesOnly(false);
     setTab('history');
   };
 
@@ -167,22 +181,53 @@ export default function PlaySession() {
           )}
         </div>
 
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] shrink-0">Ordenar:</span>
+          <button onClick={() => setSortBy('favorites')}
+            className={`chip whitespace-nowrap ${sortBy === 'favorites' ? 'chip-active' : ''}`}>
+            ♡ Favoritos
+          </button>
+          <button onClick={() => setSortBy('name-asc')}
+            className={`chip whitespace-nowrap ${sortBy === 'name-asc' ? 'chip-active' : ''}`}>
+            Nombre A-Z
+          </button>
+          <button onClick={() => setSortBy('duration-asc')}
+            className={`chip whitespace-nowrap ${sortBy === 'duration-asc' ? 'chip-active' : ''}`}>
+            Duración ↑
+          </button>
+          <button onClick={() => setSortBy('duration-desc')}
+            className={`chip whitespace-nowrap ${sortBy === 'duration-desc' ? 'chip-active' : ''}`}>
+            Duración ↓
+          </button>
+          <button
+            onClick={() => setFavoritesOnly(v => !v)}
+            title={favoritesOnly ? 'Mostrando solo favoritos' : 'Mostrar solo favoritos'}
+            className={`chip whitespace-nowrap ${favoritesOnly ? 'chip-active' : ''}`}>
+            {favoritesOnly ? '♥ Solo favoritos' : '♡ Solo favoritos'}
+          </button>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
-          {filteredBaseGames.map(game => {
+          {sortedBaseGames.map(game => {
             const emoji = GAME_EMOJIS[game.types[0]] || '🎲';
             return (
               <button key={game.id} onClick={() => { setSelectedGameId(game.id); setStep('selectPlayers'); }}
-                className="glass-card overflow-hidden text-left hover:ring-2 hover:ring-violet-500/50 transition-all group animate-slide-up">
+                className="glass-card overflow-hidden text-left hover:ring-2 hover:ring-violet-500/50 transition-all group animate-slide-up relative">
                 <div className={`h-28 relative overflow-hidden ${typeGradient(game.types[0])}`}>
                   {game.imageUrl ? (
                     <img src={game.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-4xl opacity-40">{emoji}</span>
+                      <span className="text-4xl opacity-40 group-hover:scale-110 transition-transform">{emoji}</span>
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 to-transparent" />
+                  {game.isFavorite && (
+                    <span className="absolute top-2 right-2 w-7 h-7 rounded-full bg-rose-500/90 text-white flex items-center justify-center text-xs backdrop-blur-sm border border-white/10">
+                      ♥
+                    </span>
+                  )}
                 </div>
                 <div className="p-3">
                   <h3 className="text-white text-sm font-bold leading-tight line-clamp-2">{game.name}</h3>
@@ -197,7 +242,7 @@ export default function PlaySession() {
           })}
         </div>
 
-        {filteredBaseGames.length === 0 && (
+        {sortedBaseGames.length === 0 && (
           <div className="text-center py-16 glass-card">
             <p className="text-5xl mb-4">🔍</p>
             <p className="text-[var(--text-secondary)] font-medium">No se encontraron juegos con "{gameSearch}"</p>

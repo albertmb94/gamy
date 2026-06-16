@@ -290,7 +290,7 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
 
 // ---- Game Detail ----
 function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
-  const { games, matches, players, deleteGame, setEditingGameId, setShowGameForm } = useStore();
+  const { games, matches, players, deleteGame, setEditingGameId, setShowGameForm, toggleFavorite } = useStore();
   const expansions = games.filter(g => g.baseGameId === game.id);
   const baseGame = game.isExpansion ? games.find(g => g.id === game.baseGameId) : null;
   const gameMatches = matches.filter(m => m.gameId === game.id);
@@ -322,6 +322,16 @@ function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
+          <button
+            onClick={() => toggleFavorite(game.id)}
+            title={game.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+            className={`absolute top-3 left-3 w-9 h-9 rounded-full flex items-center justify-center text-base backdrop-blur transition-all border border-white/10 ${
+              game.isFavorite
+                ? 'bg-rose-500/90 text-white hover:bg-rose-500'
+                : 'bg-black/30 text-white/80 hover:bg-black/50 hover:text-white'
+            }`}>
+            {game.isFavorite ? '♥' : '♡'}
+          </button>
           <button onClick={onClose} className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/30 backdrop-blur text-white flex items-center justify-center text-sm hover:bg-black/50 transition-colors">✕</button>
         </div>
 
@@ -402,12 +412,42 @@ function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
 }
 
 // ---- Library Main ----
+type SortKey = 'name-asc' | 'name-desc' | 'duration-asc' | 'duration-desc' | 'difficulty-asc' | 'difficulty-desc' | 'favorites' | 'recent';
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'name-asc', label: 'Nombre A-Z' },
+  { key: 'name-desc', label: 'Nombre Z-A' },
+  { key: 'duration-asc', label: 'Duración ↑' },
+  { key: 'duration-desc', label: 'Duración ↓' },
+  { key: 'difficulty-asc', label: 'Dificultad ↑' },
+  { key: 'difficulty-desc', label: 'Dificultad ↓' },
+  { key: 'favorites', label: '♡ Favoritos' },
+  { key: 'recent', label: 'Recientes' },
+];
+
+function compareGames(a: Game, b: Game, sortBy: SortKey): number {
+  switch (sortBy) {
+    case 'name-asc': return a.name.localeCompare(b.name, 'es');
+    case 'name-desc': return b.name.localeCompare(a.name, 'es');
+    case 'duration-asc': return (a.duration ?? Infinity) - (b.duration ?? Infinity);
+    case 'duration-desc': return (b.duration ?? 0) - (a.duration ?? 0);
+    case 'difficulty-asc': return (a.difficulty ?? Infinity) - (b.difficulty ?? Infinity);
+    case 'difficulty-desc': return (b.difficulty ?? 0) - (a.difficulty ?? 0);
+    case 'favorites':
+      return (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0) || a.name.localeCompare(b.name, 'es');
+    case 'recent':
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  }
+}
+
 export default function Library() {
-  const { games, showGameForm, editingGameId, setShowGameForm, setEditingGameId } = useStore();
+  const { games, showGameForm, editingGameId, setShowGameForm, setEditingGameId, toggleFavorite } = useStore();
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<GameType | ''>('');
   const [filterDifficulty, setFilterDifficulty] = useState(0);
   const [filterDurationIdx, setFilterDurationIdx] = useState(0);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortKey>('name-asc');
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -418,11 +458,13 @@ export default function Library() {
     const matchDifficulty = !filterDifficulty || (g.difficulty || 0) === filterDifficulty;
     const dur = DURATION_RANGES[filterDurationIdx];
     const matchDuration = filterDurationIdx === 0 || ((g.duration || 0) >= dur.min && (g.duration || 0) <= dur.max);
-    return matchSearch && matchType && matchDifficulty && matchDuration;
+    const matchFavorite = !favoritesOnly || !!g.isFavorite;
+    return matchSearch && matchType && matchDifficulty && matchDuration && matchFavorite;
   });
+  const sorted = [...filtered].sort((a, b) => compareGames(a, b, sortBy));
 
   const gameToEdit = editingGameId ? games.find(g => g.id === editingGameId) : undefined;
-  const activeFiltersCount = (filterType ? 1 : 0) + (filterDifficulty ? 1 : 0) + (filterDurationIdx ? 1 : 0);
+  const activeFiltersCount = (filterType ? 1 : 0) + (filterDifficulty ? 1 : 0) + (filterDurationIdx ? 1 : 0) + (favoritesOnly ? 1 : 0);
 
   return (
     <div className="space-y-4">
@@ -444,6 +486,12 @@ export default function Library() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar juego..."
             className="input-field pl-10" />
         </div>
+        <button
+          onClick={() => setFavoritesOnly(v => !v)}
+          title={favoritesOnly ? 'Mostrando solo favoritos' : 'Mostrar solo favoritos'}
+          className={`relative btn px-3.5 py-2.5 ${favoritesOnly ? 'btn-primary' : 'btn-secondary'}`}>
+          {favoritesOnly ? '♥' : '♡'}
+        </button>
         <button onClick={() => setShowFilters(!showFilters)}
           className={`relative btn ${showFilters ? 'btn-primary' : 'btn-secondary'} px-3.5 py-2.5`}>
           🎛️
@@ -453,6 +501,17 @@ export default function Library() {
             </span>
           )}
         </button>
+      </div>
+
+      {/* Sort selector */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] shrink-0">Ordenar:</span>
+        {SORT_OPTIONS.map(opt => (
+          <button key={opt.key} onClick={() => setSortBy(opt.key)}
+            className={`chip whitespace-nowrap ${sortBy === opt.key ? 'chip-active' : ''}`}>
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {showFilters && (
@@ -493,7 +552,7 @@ export default function Library() {
             </div>
           </div>
           {activeFiltersCount > 0 && (
-            <button onClick={() => { setFilterType(''); setFilterDifficulty(0); setFilterDurationIdx(0); }}
+            <button onClick={() => { setFilterType(''); setFilterDifficulty(0); setFilterDurationIdx(0); setFavoritesOnly(false); }}
               className="text-xs text-rose-400 hover:text-rose-300 font-semibold">
               ✕ Limpiar filtros
             </button>
@@ -503,7 +562,7 @@ export default function Library() {
 
       {/* Game Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {filtered.map(game => {
+        {sorted.map(game => {
           const expansionCount = games.filter(g => g.baseGameId === game.id).length;
           const emoji = GAME_EMOJIS[game.types[0]] || '🎲';
           return (
@@ -519,6 +578,16 @@ export default function Library() {
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent" />
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleFavorite(game.id); }}
+                  title={game.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                  className={`absolute top-2 left-2 w-8 h-8 rounded-full flex items-center justify-center text-sm backdrop-blur-sm transition-all border border-white/10 ${
+                    game.isFavorite
+                      ? 'bg-rose-500/90 text-white hover:bg-rose-500'
+                      : 'bg-black/40 text-white/80 hover:bg-black/60 hover:text-white'
+                  }`}>
+                  {game.isFavorite ? '♥' : '♡'}
+                </button>
                 {expansionCount > 0 && (
                   <span className="absolute top-2 right-2 text-[10px] bg-violet-600/90 text-white px-2 py-0.5 rounded-full font-bold backdrop-blur-sm border border-white/10">
                     +{expansionCount}
@@ -542,7 +611,7 @@ export default function Library() {
         })}
       </div>
 
-      {filtered.length === 0 && (
+      {sorted.length === 0 && (
         <div className="text-center py-16 glass-card">
           <p className="text-5xl mb-4">📭</p>
           <p className="text-[var(--text-secondary)] font-medium">No se encontraron juegos</p>

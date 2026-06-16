@@ -25,6 +25,7 @@ export interface Game {
   specialVictoryTypes?: string[];
   difficulty?: number; // 1-5 stars
   duration?: number; // in minutes
+  isFavorite?: boolean;
   createdAt: string;
 }
 
