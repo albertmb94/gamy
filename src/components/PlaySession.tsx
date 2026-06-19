@@ -3,6 +3,7 @@ import { Search, X, Dices, Check, Crown, Package, Target, Rocket } from 'lucide-
 import { useStore } from '../store/useStore';
 import { PlayerScore, ScoreCategory } from '../types';
 import { cn } from '../utils/cn';
+import { GameCover } from './GameCover';
 
 type PlayStep = 'selectGame' | 'selectPlayers' | 'configure' | 'scoring';
 
@@ -202,7 +203,6 @@ export default function PlaySession() {
 
         <div className="grid grid-cols-2 gap-3">
           {sortedBaseGames.map(game => {
-            const emoji = GAME_EMOJIS[game.types[0]] || '🎲';
             return (
               <button key={game.id} onClick={() => { setSelectedGameId(game.id); setStep('selectPlayers'); }}
                 className="glass-card overflow-hidden text-left hover:border-foreground/30 transition-colors group animate-slide-up relative">
@@ -211,9 +211,7 @@ export default function PlaySession() {
                     <img src={game.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-4xl opacity-30 group-hover:scale-110 transition-transform">{emoji}</span>
-                    </div>
+                    <GameCover game={game} className="group-hover:scale-105 transition-transform duration-500" />
                   )}
                   {game.isFavorite && (
                     <span className="absolute top-2 right-2 w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs backdrop-blur-sm">♥</span>

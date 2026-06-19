@@ -5,6 +5,7 @@ import { useRemigioStore } from '../store/useRemigioStore';
 import { Game, GameType, ScoringTemplate, ScoreCategory } from '../types';
 import { v4 as uuid } from 'uuid';
 import { cn } from '../utils/cn';
+import { GameCover } from './GameCover';
 
 const ALL_TYPES: GameType[] = ['Estrategia', 'Cartas', 'Filler', 'Cooperativo', 'Dados', 'Puzzle', 'Construcción', 'Negociación', 'Destreza', 'Familiar', 'Abstracto', 'Duel'];
 
@@ -310,8 +311,6 @@ function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
     }
   };
 
-  const emoji = GAME_EMOJIS[game.types[0]] || '🎲';
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-panel overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -320,9 +319,7 @@ function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
             <img src={game.imageUrl} alt={game.name} className="w-full h-full object-cover"
               onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <span className="text-7xl opacity-30">{emoji}</span>
-            </div>
+            <GameCover game={game} large />
           )}
           <button
             onClick={() => toggleFavorite(game.id)}
@@ -595,7 +592,6 @@ export default function Library() {
         {showRemigio && <RemigioTile />}
         {sorted.map(game => {
           const expansionCount = games.filter(g => g.baseGameId === game.id).length;
-          const emoji = GAME_EMOJIS[game.types[0]] || '🎲';
           return (
             <button key={game.id} onClick={() => setSelectedGame(game)}
               className="glass-card overflow-hidden text-left hover:border-foreground/30 transition-colors group animate-slide-up">
@@ -604,9 +600,7 @@ export default function Library() {
                   <img src={game.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="text-5xl opacity-30 group-hover:scale-110 transition-transform">{emoji}</span>
-                  </div>
+                  <GameCover game={game} className="group-hover:scale-105 transition-transform duration-500" />
                 )}
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleFavorite(game.id); }}
