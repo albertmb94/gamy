@@ -5,7 +5,9 @@ import {
   loadRemigioSessions,
   saveRemigioSession,
   deleteRemigioSession,
+  importRemigioSeedOnce,
 } from '../db/localDb';
+import { remigioSeed } from '../remigio/seed';
 
 export type RemigioScreen = 'list' | 'new' | 'session';
 
@@ -43,7 +45,11 @@ export const useRemigioStore = create<RemigioState>()((set) => ({
   activeSessionId: null,
 
   load: async () => {
-    const sessions = await loadRemigioSessions();
+    // Importa (una sola vez) las partidas históricas migradas de brisca-app.
+    await importRemigioSeedOnce(remigioSeed).catch((e) => console.error('Error importing remigio seed:', e));
+    const sessions = (await loadRemigioSessions()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
     set({ sessions, hydrated: true });
   },
 

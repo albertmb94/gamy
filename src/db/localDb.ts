@@ -195,3 +195,23 @@ export async function deleteRemigioSession(id: string) {
   const db = await getDb();
   await db.delete('remigioSessions', id);
 }
+
+/**
+ * Importa una sola vez las partidas históricas de brisca-app a IndexedDB.
+ * Idempotente: usa una bandera en `meta` y no sobrescribe partidas existentes,
+ * de modo que no duplica ni reintroduce partidas que el usuario haya borrado.
+ */
+export async function importRemigioSeedOnce(seed: RemigioSession[]): Promise<void> {
+  const db = await getDb();
+  const alreadyImported = await db.get('meta', 'remigioImported');
+  if (alreadyImported === true) return;
+
+  const tx = db.transaction(['remigioSessions', 'meta'], 'readwrite');
+  const store = tx.objectStore('remigioSessions');
+  for (const session of seed) {
+    const existing = await store.get(session.id);
+    if (!existing) await store.put(session);
+  }
+  await tx.objectStore('meta').put(true, 'remigioImported');
+  await tx.done;
+}
