@@ -53,6 +53,7 @@ export interface RemigioSession {
   price_per_game: number;
   price_per_reentry: number;
   created_at: string;
+  updated_at?: string;
   ended_at?: string;
   winner_id?: string;
   players: RemigioPlayer[];

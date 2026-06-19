@@ -1,5 +1,6 @@
 import { createClient, Client } from '@libsql/client/web';
 import { DbStatus, Game, Player, MatchRecord, PlayerAchievement } from '../types';
+import { RemigioSession } from '../remigio/types';
 
 /**
  * Gamy Database Connection Layer
@@ -104,6 +105,16 @@ export async function ensureSchema(): Promise<boolean> {
         match_id TEXT,
         PRIMARY KEY (achievement_id, player_id)
       );`,
+      `CREATE TABLE IF NOT EXISTS remigio_sessions (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        status TEXT,
+        data TEXT NOT NULL,
+        created_at TEXT,
+        updated_at TEXT,
+        ended_at TEXT,
+        winner_id TEXT
+      );`,
     ], 'write');
     // Migración: añadir columna is_favorite si la tabla ya existía sin ella.
     try {
@@ -164,7 +175,7 @@ export function startDbMonitor(cb: (status: ExtendedDbStatus) => void) {
 }
 
 export async function syncItemToRemote(
-  type: 'game' | 'player' | 'match' | 'achievement',
+  type: 'game' | 'player' | 'match' | 'achievement' | 'remigio',
   payload: unknown,
   isDelete = false
 ): Promise<boolean> {
@@ -185,6 +196,7 @@ export async function syncItemToRemote(
             args: [p.achievementId, p.playerId],
           });
         }
+        else if (type === 'remigio') await client.execute({ sql: 'DELETE FROM remigio_sessions WHERE id = ?', args: [p.id] });
         return true;
       }
 
@@ -241,6 +253,12 @@ export async function syncItemToRemote(
         await client.execute({
           sql: `INSERT OR REPLACE INTO player_achievements (achievement_id, player_id, unlocked_at, match_id) VALUES (?, ?, ?, ?)`,
           args: [ach.achievementId, ach.playerId, ach.unlockedAt, ach.matchId ?? null],
+        });
+      } else if (type === 'remigio') {
+        const s = p as any;
+        await client.execute({
+          sql: `INSERT OR REPLACE INTO remigio_sessions (id, name, status, data, created_at, updated_at, ended_at, winner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [s.id, s.name, s.status, JSON.stringify(s), s.created_at, s.updated_at ?? s.created_at, s.ended_at ?? null, s.winner_id ?? null],
         });
       }
       return true;
@@ -345,5 +363,22 @@ export async function fetchRemoteState(): Promise<{
   } catch (e) {
     console.error('Error fetching remote state:', e);
     return { games: [], players: [], matches: [], playerAchievements: [] };
+  }
+}
+
+/** Descarga las partidas de Remigio almacenadas en Turso. */
+export async function fetchRemoteRemigio(): Promise<RemigioSession[]> {
+  const client = getTursoClient();
+  if (!client) return [];
+  try {
+    await ensureSchema();
+    const res = await client.execute('SELECT data FROM remigio_sessions');
+    return (res.rows as any[])
+      .map((row) => safeJson<RemigioSession | null>(row.data, null))
+      .filter((s): s is RemigioSession => !!s && typeof s.id === 'string')
+      .map((s) => ({ ...s, synced: true }));
+  } catch (e) {
+    console.error('Error fetching remote remigio sessions:', e);
+    return [];
   }
 }

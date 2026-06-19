@@ -21,12 +21,19 @@ const TABS = [
 
 export default function App() {
   const { currentTab, setTab, loadFromLocalDb, matches } = useStore();
+  const dbStatus = useStore((s) => s.dbStatus);
   const loadRemigio = useRemigioStore((s) => s.load);
+  const syncRemigio = useRemigioStore((s) => s.syncAll);
 
   useEffect(() => {
     loadFromLocalDb();
     loadRemigio();
   }, [loadFromLocalDb, loadRemigio]);
+
+  // Cuando se (re)establece la conexión con Turso, sincroniza Remigio.
+  useEffect(() => {
+    if (dbStatus === 'connected') syncRemigio();
+  }, [dbStatus, syncRemigio]);
 
   const tabContent = () => {
     switch (currentTab) {

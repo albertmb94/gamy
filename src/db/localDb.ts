@@ -196,6 +196,19 @@ export async function deleteRemigioSession(id: string) {
   await db.delete('remigioSessions', id);
 }
 
+// Tombstones de partidas de Remigio borradas que aún no se han propagado a
+// Turso (p. ej. borradas sin conexión). Se reintenta su borrado al sincronizar.
+export async function getRemigioTombstones(): Promise<string[]> {
+  const db = await getDb();
+  const raw = await db.get('meta', 'remigioDeleted');
+  return typeof raw === 'string' ? (JSON.parse(raw) as string[]) : [];
+}
+
+export async function setRemigioTombstones(ids: string[]) {
+  const db = await getDb();
+  await db.put('meta', JSON.stringify(ids), 'remigioDeleted');
+}
+
 /**
  * Importa una sola vez las partidas históricas de brisca-app a IndexedDB.
  * Idempotente: usa una bandera en `meta` y no sobrescribe partidas existentes,

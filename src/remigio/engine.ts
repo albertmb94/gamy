@@ -42,6 +42,7 @@ export function createSession(config: NewSessionConfig): RemigioSession {
     price_per_game: config.pricePerGame,
     price_per_reentry: config.pricePerReentry,
     created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     players,
     rounds: [],
     transactions: [],
@@ -170,6 +171,7 @@ export function applyRound(
   }
 
   session.synced = false;
+  session.updated_at = new Date().toISOString();
   return session;
 }
 

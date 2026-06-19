@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
+import { useRemigioStore } from '../store/useRemigioStore';
+import { getBalance } from '../remigio/engine';
 import { GameType } from '../types';
 
 const ALL_TYPES: GameType[] = ['Estrategia', 'Cartas', 'Filler', 'Cooperativo', 'Dados', 'Puzzle', 'Construcción', 'Negociación', 'Destreza', 'Familiar', 'Abstracto', 'Duel'];
@@ -10,7 +12,7 @@ const GAME_EMOJIS: Record<string, string> = {
   'Destreza': '🎯', 'Familiar': '👨‍👩‍👧‍👦', 'Abstracto': '🔷', 'Duel': '⚔️',
 };
 
-type StatsView = 'global' | 'game' | 'type' | 'achievements';
+type StatsView = 'global' | 'game' | 'type' | 'remigio' | 'achievements';
 
 const ACHIEVEMENTS_MAP: Record<string, { name: string; icon: string; description: string }> = {
   racha_3: { name: 'Racha de 3', icon: '🔥', description: 'Ganar 3 partidas consecutivas' },
@@ -20,6 +22,7 @@ const ACHIEVEMENTS_MAP: Record<string, { name: string; icon: string; description
 
 export default function Stats() {
   const { players, matches, games, playerAchievements } = useStore();
+  const remigioSessions = useRemigioStore(s => s.sessions);
   const [view, setView] = useState<StatsView>('global');
   const [filterGameId, setFilterGameId] = useState('');
   const [filterType, setFilterType] = useState<GameType | ''>('');
@@ -64,6 +67,25 @@ export default function Stats() {
     }).sort((a, b) => b.wins - a.wins || b.winRate - a.winRate);
   }, [players, filteredMatches]);
 
+  // Ranking de Remigio: agregado por nombre de jugador (invitado) a lo largo
+  // de todas las partidas. Lo relevante aquí es el balance económico.
+  const remigioRanking = useMemo(() => {
+    const byName = new Map<string, { name: string; partidas: number; wins: number; rounds: number; balance: number }>();
+    for (const s of remigioSessions) {
+      for (const p of s.players) {
+        const key = p.guest_name.trim().toLowerCase();
+        if (!key) continue;
+        const e = byName.get(key) ?? { name: p.guest_name.trim(), partidas: 0, wins: 0, rounds: 0, balance: 0 };
+        e.partidas += 1;
+        if (s.winner_id === p.id) e.wins += 1;
+        e.rounds += p.total_rounds_won;
+        e.balance += getBalance(s, p.id);
+        byName.set(key, e);
+      }
+    }
+    return [...byName.values()].sort((a, b) => b.balance - a.balance || b.wins - a.wins);
+  }, [remigioSessions]);
+
   return (
     <div className="space-y-4">
       <div>
@@ -77,6 +99,7 @@ export default function Stats() {
             { key: 'global', label: '🌍 Global' },
             { key: 'game', label: '🎲 Juego' },
             { key: 'type', label: '🏷️ Tipo' },
+            { key: 'remigio', label: '🃏 Remigio' },
             { key: 'achievements', label: '🏆 Logros' },
           ].map(({ key, label }) => (
             <button key={key} onClick={() => { setView(key as StatsView); setFilterGameId(''); setFilterType(''); setFilterExpansionId(''); }}
@@ -117,7 +140,7 @@ export default function Stats() {
         </div>
       )}
 
-      {view !== 'achievements' && (
+      {(view === 'global' || view === 'game' || view === 'type') && (
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ranking</h3>
@@ -171,6 +194,58 @@ export default function Stats() {
                   <div className="bg-secondary rounded-lg py-1.5">
                     <p className="text-[10px] text-muted-foreground">Racha</p>
                     <p className="text-xs text-amber-600 font-bold">{r.bestStreak}🔥</p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {view === 'remigio' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ranking de Remigio</h3>
+            <span className="text-xs text-muted-foreground font-semibold">{remigioSessions.length} partidas</span>
+          </div>
+
+          {remigioRanking.length === 0 ? (
+            <div className="text-center py-12 glass-card">
+              <p className="text-muted-foreground">Aún no hay partidas de Remigio</p>
+            </div>
+          ) : (
+            remigioRanking.map((r, idx) => (
+              <div key={r.name} className={`glass-card p-4 ${idx === 0 && r.balance > 0 ? 'ring-1 ring-amber-400/50' : ''}`}>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-lg w-7 text-center">
+                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                  </span>
+                  <div className="w-10 h-10 rounded-full bg-secondary text-foreground flex items-center justify-center font-bold border border-border">
+                    {r.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-foreground font-bold text-sm truncate">{r.name}</h4>
+                    <p className="text-xs text-muted-foreground">{r.partidas} partidas · {r.wins} ganadas</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`font-black text-lg tabular-nums ${r.balance > 0 ? 'text-green-600' : r.balance < 0 ? 'text-red-600' : 'text-foreground'}`}>
+                      {r.balance > 0 ? '+' : ''}{r.balance.toFixed(2)}€
+                    </p>
+                    <p className="text-xs text-muted-foreground font-semibold">balance</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-secondary rounded-lg py-1.5">
+                    <p className="text-[10px] text-muted-foreground">Partidas</p>
+                    <p className="text-xs text-foreground font-bold">{r.partidas}</p>
+                  </div>
+                  <div className="bg-secondary rounded-lg py-1.5">
+                    <p className="text-[10px] text-muted-foreground">Victorias</p>
+                    <p className="text-xs text-green-600 font-bold">{r.wins}</p>
+                  </div>
+                  <div className="bg-secondary rounded-lg py-1.5">
+                    <p className="text-[10px] text-muted-foreground">Rondas ganadas</p>
+                    <p className="text-xs text-foreground font-bold">{r.rounds}</p>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Crown, Pencil, Trash2, Save, X, Target, ScrollText } from 'lucide-react';
+import { Crown, Pencil, Trash2, Save, X, Target, ScrollText, Spade } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { useRemigioStore } from '../store/useRemigioStore';
+import { getBalance, statusLabel } from '../remigio/engine';
 import { cn } from '../utils/cn';
 
 const GAME_EMOJIS: Record<string, string> = {
@@ -9,8 +11,15 @@ const GAME_EMOJIS: Record<string, string> = {
   'Destreza': '🎯', 'Familiar': '👨‍👩‍👧‍👦', 'Abstracto': '🔷', 'Duel': '⚔️',
 };
 
+type Entry =
+  | { kind: 'match'; date: string; id: string }
+  | { kind: 'remigio'; date: string; id: string };
+
 export default function History() {
   const { matches, games, players, deleteMatch, updateMatch } = useStore();
+  const remigioSessions = useRemigioStore(s => s.sessions);
+  const openRemigioModule = useRemigioStore(s => s.openModule);
+  const openRemigioSession = useRemigioStore(s => s.openSession);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editingScores, setEditingScores] = useState<Record<string, Record<string, number>> | null>(null);
   const [filterGameId, setFilterGameId] = useState('');
@@ -20,12 +29,22 @@ export default function History() {
   const sortedMatches = [...matches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const filteredMatches = sortedMatches.filter(m => {
-    if (filterGameId && m.gameId !== filterGameId) return false;
+    if (filterGameId && m.gameId !== filterGameId && filterGameId !== 'remigio') return false;
+    if (filterGameId === 'remigio') return false; // solo Remigio: ocultar matches normales
     if (filterExpansionId && !m.activeExpansionIds.includes(filterExpansionId)) return false;
     return true;
   });
 
-  const filterExpansions = filterGameId ? games.filter(g => g.baseGameId === filterGameId) : [];
+  const filterExpansions = filterGameId && filterGameId !== 'remigio' ? games.filter(g => g.baseGameId === filterGameId) : [];
+
+  // Línea de tiempo unificada: partidas normales + partidas de Remigio.
+  const showRemigio = filterGameId === '' || filterGameId === 'remigio';
+  const entries: Entry[] = [
+    ...filteredMatches.map(m => ({ kind: 'match' as const, date: m.date, id: m.id })),
+    ...(showRemigio ? remigioSessions.map(s => ({ kind: 'remigio' as const, date: s.created_at, id: s.id })) : []),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const openRemigio = (id: string) => { openRemigioModule(); openRemigioSession(id); };
 
   const detailMatch = detailId ? matches.find(m => m.id === detailId) : null;
   const detailGame = detailMatch ? games.find(g => g.id === detailMatch.gameId) : null;
@@ -75,7 +94,7 @@ export default function History() {
     <div className="space-y-4">
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-foreground">Historial</h2>
-        <p className="text-sm text-muted-foreground">{matches.length} partidas registradas</p>
+        <p className="text-sm text-muted-foreground">{matches.length + remigioSessions.length} partidas registradas</p>
       </div>
 
       {/* Filters */}
@@ -83,6 +102,7 @@ export default function History() {
         <select value={filterGameId} onChange={e => { setFilterGameId(e.target.value); setFilterExpansionId(''); }}
           className="input-field flex-1">
           <option value="">Todos los juegos</option>
+          <option value="remigio">🃏 Remigio</option>
           {baseGames.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
         {filterExpansions.length > 0 && (
@@ -94,9 +114,48 @@ export default function History() {
         )}
       </div>
 
-      {/* Match list */}
+      {/* Unified timeline: matches + Remigio */}
       <div className="space-y-3">
-        {filteredMatches.map(match => {
+        {entries.map(entry => {
+          if (entry.kind === 'remigio') {
+            const session = remigioSessions.find(s => s.id === entry.id);
+            if (!session) return null;
+            const winner = session.players.find(p => p.id === session.winner_id);
+            return (
+              <button key={`r-${session.id}`} onClick={() => openRemigio(session.id)}
+                className="w-full glass-card p-4 text-left hover:border-foreground/30 transition-colors animate-slide-up">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-6 h-6 rounded bg-primary text-primary-foreground flex items-center justify-center shrink-0"><Spade className="h-3.5 w-3.5" /></span>
+                    <span className="text-foreground font-bold text-sm truncate">Remigio · {session.name}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">{formatDate(session.created_at)}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  <span className="text-[10px] bg-secondary text-muted-foreground px-2 py-0.5 rounded-full border border-border">{statusLabel(session.status)} · {session.rounds.length} rondas</span>
+                  {winner && (
+                    <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1"><Crown className="h-3 w-3" /> {winner.guest_name}</span>
+                  )}
+                  {!session.synced && (
+                    <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 ml-auto">⏳ Sin sincronizar</span>
+                  )}
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  {session.players.map(p => {
+                    const bal = getBalance(session, p.id);
+                    return (
+                      <span key={p.id} className={cn('text-[10px] px-2 py-1 rounded-full font-semibold border', p.id === session.winner_id ? 'bg-amber-100 text-amber-700 border-amber-200' : 'text-muted-foreground bg-secondary border-border')}>
+                        {p.guest_name}{session.transactions.length > 0 ? `: ${bal > 0 ? '+' : ''}${bal.toFixed(2)}€` : ''}
+                      </span>
+                    );
+                  })}
+                </div>
+              </button>
+            );
+          }
+
+          const match = matches.find(m => m.id === entry.id);
+          if (!match) return null;
           const game = games.find(g => g.id === match.gameId);
           const winner = players.find(p => p.id === match.winnerId);
           const emoji = GAME_EMOJIS[game?.types[0] || ''] || '🎲';
@@ -141,7 +200,7 @@ export default function History() {
         })}
       </div>
 
-      {filteredMatches.length === 0 && (
+      {entries.length === 0 && (
         <div className="text-center py-16 glass-card">
           <ScrollText className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
           <p className="text-muted-foreground font-medium">No hay partidas registradas</p>
