@@ -28,11 +28,11 @@ export default function DbIndicator() {
   return (
     <div className="flex items-center gap-2">
       <div className={`w-2.5 h-2.5 rounded-full ${color} ${dbStatus === 'reconnecting' ? 'animate-pulse' : ''}`} />
-      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-xs text-muted-foreground hidden sm:inline">{label}</span>
       {pendingSyncQueue.length > 0 && (
         <button
           onClick={syncPendingItems}
-          className="text-xs text-amber-400 hover:text-amber-300 underline"
+          className="text-xs text-foreground hover:opacity-70 underline"
           title="Intentar sincronizar cambios pendientes"
         >
           ({pendingSyncQueue.length} pendientes)

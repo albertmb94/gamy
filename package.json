@@ -13,6 +13,7 @@
     "@types/uuid": "^10.0.0",
     "clsx": "2.1.1",
     "idb": "^8.0.3",
+    "lucide-react": "^1.21.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "3.4.0",

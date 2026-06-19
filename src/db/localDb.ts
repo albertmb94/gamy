@@ -1,8 +1,9 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Game, Player, MatchRecord, PlayerAchievement } from '../types';
+import { RemigioSession } from '../remigio/types';
 
 const DB_NAME = 'gamy-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 interface GamyDB extends DBSchema {
   games: {
@@ -20,6 +21,10 @@ interface GamyDB extends DBSchema {
   achievements: {
     key: [string, string];
     value: PlayerAchievement;
+  };
+  remigioSessions: {
+    key: string;
+    value: RemigioSession;
   };
   syncQueue: {
     key: string;
@@ -52,6 +57,12 @@ export function getDb() {
             db.deleteObjectStore('achievements');
           }
           db.createObjectStore('achievements', { keyPath: ['achievementId', 'playerId'] });
+        }
+        if (oldVersion < 3) {
+          // Partidas de Remigio (integración de brisca-app).
+          if (!db.objectStoreNames.contains('remigioSessions')) {
+            db.createObjectStore('remigioSessions', { keyPath: 'id' });
+          }
         }
       },
     });
@@ -159,4 +170,28 @@ export async function getSyncQueue(): Promise<{ id: string; type: 'match' | 'pla
 export async function clearSyncItem(id: string) {
   const db = await getDb();
   await db.delete('syncQueue', id);
+}
+
+// ----- Remigio -----
+// Las partidas de Remigio se guardan localmente. La sincronización remota
+// (migración de las partidas de brisca-app) se abordará más adelante.
+
+export async function loadRemigioSessions(): Promise<RemigioSession[]> {
+  try {
+    const db = await getDb();
+    return await db.getAll('remigioSessions');
+  } catch (e) {
+    console.error('Error loading remigio sessions:', e);
+    return [];
+  }
+}
+
+export async function saveRemigioSession(session: RemigioSession) {
+  const db = await getDb();
+  await db.put('remigioSessions', session);
+}
+
+export async function deleteRemigioSession(id: string) {
+  const db = await getDb();
+  await db.delete('remigioSessions', id);
 }

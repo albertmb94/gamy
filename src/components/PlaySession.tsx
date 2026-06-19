@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
+import { Search, X, Dices, Check, Crown, Package, Target, Rocket } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { Game, PlayerScore, ScoreCategory } from '../types';
+import { PlayerScore, ScoreCategory } from '../types';
+import { cn } from '../utils/cn';
 
 type PlayStep = 'selectGame' | 'selectPlayers' | 'configure' | 'scoring';
 
@@ -11,7 +13,7 @@ const GAME_EMOJIS: Record<string, string> = {
 };
 
 function typeGradient(type: string) {
-  const key = type.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const key = type.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   return `type-gradient-${key}`;
 }
 
@@ -22,8 +24,8 @@ function StepHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
         <button onClick={onBack} className="btn btn-secondary px-3 py-2 text-sm">← Atrás</button>
       )}
       <div>
-        <h2 className="text-2xl font-extrabold text-white">{title}</h2>
-        {subtitle && <p className="text-sm text-[var(--text-secondary)]">{subtitle}</p>}
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">{title}</h2>
+        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
       </div>
     </div>
   );
@@ -173,35 +175,26 @@ export default function PlaySession() {
         <StepHeader title="¿A qué jugamos?" subtitle="Elige un juego de tu ludoteca" />
 
         <div className="relative">
-          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm">🔍</span>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <input value={gameSearch} onChange={e => setGameSearch(e.target.value)} placeholder="Buscar juego..."
             className="input-field pl-10" />
           {gameSearch && (
-            <button onClick={() => setGameSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-white">✕</button>
+            <button onClick={() => setGameSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
           )}
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] shrink-0">Ordenar:</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Ordenar:</span>
           <button onClick={() => setSortBy('favorites')}
-            className={`chip whitespace-nowrap ${sortBy === 'favorites' ? 'chip-active' : ''}`}>
-            ♡ Favoritos
-          </button>
+            className={`chip whitespace-nowrap ${sortBy === 'favorites' ? 'chip-active' : ''}`}>♡ Favoritos</button>
           <button onClick={() => setSortBy('name-asc')}
-            className={`chip whitespace-nowrap ${sortBy === 'name-asc' ? 'chip-active' : ''}`}>
-            Nombre A-Z
-          </button>
+            className={`chip whitespace-nowrap ${sortBy === 'name-asc' ? 'chip-active' : ''}`}>Nombre A-Z</button>
           <button onClick={() => setSortBy('duration-asc')}
-            className={`chip whitespace-nowrap ${sortBy === 'duration-asc' ? 'chip-active' : ''}`}>
-            Duración ↑
-          </button>
+            className={`chip whitespace-nowrap ${sortBy === 'duration-asc' ? 'chip-active' : ''}`}>Duración ↑</button>
           <button onClick={() => setSortBy('duration-desc')}
-            className={`chip whitespace-nowrap ${sortBy === 'duration-desc' ? 'chip-active' : ''}`}>
-            Duración ↓
-          </button>
+            className={`chip whitespace-nowrap ${sortBy === 'duration-desc' ? 'chip-active' : ''}`}>Duración ↓</button>
           <button
             onClick={() => setFavoritesOnly(v => !v)}
-            title={favoritesOnly ? 'Mostrando solo favoritos' : 'Mostrar solo favoritos'}
             className={`chip whitespace-nowrap ${favoritesOnly ? 'chip-active' : ''}`}>
             {favoritesOnly ? '♥ Solo favoritos' : '♡ Solo favoritos'}
           </button>
@@ -212,28 +205,25 @@ export default function PlaySession() {
             const emoji = GAME_EMOJIS[game.types[0]] || '🎲';
             return (
               <button key={game.id} onClick={() => { setSelectedGameId(game.id); setStep('selectPlayers'); }}
-                className="glass-card overflow-hidden text-left hover:ring-2 hover:ring-violet-500/50 transition-all group animate-slide-up relative">
+                className="glass-card overflow-hidden text-left hover:border-foreground/30 transition-colors group animate-slide-up relative">
                 <div className={`h-28 relative overflow-hidden ${typeGradient(game.types[0])}`}>
                   {game.imageUrl ? (
                     <img src={game.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-4xl opacity-40 group-hover:scale-110 transition-transform">{emoji}</span>
+                      <span className="text-4xl opacity-30 group-hover:scale-110 transition-transform">{emoji}</span>
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 to-transparent" />
                   {game.isFavorite && (
-                    <span className="absolute top-2 right-2 w-7 h-7 rounded-full bg-rose-500/90 text-white flex items-center justify-center text-xs backdrop-blur-sm border border-white/10">
-                      ♥
-                    </span>
+                    <span className="absolute top-2 right-2 w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs backdrop-blur-sm">♥</span>
                   )}
                 </div>
                 <div className="p-3">
-                  <h3 className="text-white text-sm font-bold leading-tight line-clamp-2">{game.name}</h3>
+                  <h3 className="text-foreground text-sm font-bold leading-tight line-clamp-2">{game.name}</h3>
                   <div className="flex flex-wrap gap-1 mt-1.5">
                     {game.types.slice(0, 2).map(t => (
-                      <span key={t} className="text-[9px] bg-slate-700/60 text-slate-300 px-1.5 py-0.5 rounded">{t}</span>
+                      <span key={t} className="text-[9px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">{t}</span>
                     ))}
                   </div>
                 </div>
@@ -244,8 +234,8 @@ export default function PlaySession() {
 
         {sortedBaseGames.length === 0 && (
           <div className="text-center py-16 glass-card">
-            <p className="text-5xl mb-4">🔍</p>
-            <p className="text-[var(--text-secondary)] font-medium">No se encontraron juegos con "{gameSearch}"</p>
+            <Search className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+            <p className="text-muted-foreground font-medium">No se encontraron juegos{gameSearch && ` con "${gameSearch}"`}</p>
           </div>
         )}
       </div>
@@ -269,41 +259,39 @@ export default function PlaySession() {
             </div>
           )}
           <div>
-            <p className="text-sm text-white font-bold">{selectedGame?.name}</p>
-            <p className="text-xs text-[var(--text-secondary)]">{selectedGame?.types.join(' • ')}</p>
+            <p className="text-sm text-foreground font-bold">{selectedGame?.name}</p>
+            <p className="text-xs text-muted-foreground">{selectedGame?.types.join(' • ')}</p>
           </div>
         </div>
 
         <div className="space-y-2">
-          {players.map(player => (
-            <button key={player.id} onClick={() => togglePlayer(player.id)}
-              className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all border ${
-                selectedPlayerIds.includes(player.id)
-                  ? 'bg-violet-600/15 border-violet-500/50 ring-1 ring-violet-500/30'
-                  : 'bg-slate-800/40 border-[var(--border)] hover:bg-slate-800/70'
-              }`}>
-              <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold shadow-md"
-                style={{ backgroundColor: player.color }}>
-                {player.name.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-white font-semibold flex-1 text-left">{player.name}</span>
-              {selectedPlayerIds.includes(player.id) && (
-                <span className="w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs">✓</span>
-              )}
-            </button>
-          ))}
+          {players.map(player => {
+            const sel = selectedPlayerIds.includes(player.id);
+            return (
+              <button key={player.id} onClick={() => togglePlayer(player.id)}
+                className={cn('w-full flex items-center gap-3 p-3.5 rounded-xl transition-all border', sel ? 'bg-secondary border-foreground/30 ring-1 ring-foreground/15' : 'bg-card border-border hover:bg-secondary')}>
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold"
+                  style={{ backgroundColor: player.color }}>
+                  {player.name.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-foreground font-semibold flex-1 text-left">{player.name}</span>
+                {sel && (
+                  <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center"><Check className="h-3.5 w-3.5" /></span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {players.length === 0 && (
           <div className="text-center py-12 glass-card">
-            <p className="text-4xl mb-3">👤</p>
-            <p className="text-[var(--text-secondary)]">Añade jugadores primero en la pestaña Jugadores</p>
+            <p className="text-muted-foreground">Añade jugadores primero en la pestaña Jugadores</p>
           </div>
         )}
 
         {selectedPlayerIds.length >= 1 && (
           <button onClick={() => setStep('configure')}
-            className="w-full btn btn-primary py-3.5 text-base shadow-lg shadow-violet-900/40">
+            className="w-full btn btn-primary py-3.5 text-base">
             Continuar con {selectedPlayerIds.length} jugadores
           </button>
         )}
@@ -322,41 +310,38 @@ export default function PlaySession() {
 
         {expansions.length > 0 && (
           <div className="glass-card p-4">
-            <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-              <span>📦</span> Expansiones
+            <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+              <Package className="h-4 w-4" /> Expansiones
             </h3>
             <div className="space-y-2">
-              {expansions.map(exp => (
-                <button key={exp.id} onClick={() => toggleExpansion(exp.id)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${
-                    activeExpansionIds.includes(exp.id)
-                      ? 'bg-violet-600/15 border-violet-500/50'
-                      : 'bg-slate-800/40 border-[var(--border)] hover:bg-slate-800/70'
-                  }`}>
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                    activeExpansionIds.includes(exp.id) ? 'bg-violet-600 border-violet-600' : 'border-slate-500'
-                  }`}>
-                    {activeExpansionIds.includes(exp.id) && <span className="text-white text-xs">✓</span>}
-                  </div>
-                  <span className="text-sm text-white font-medium">{exp.name}</span>
-                </button>
-              ))}
+              {expansions.map(exp => {
+                const on = activeExpansionIds.includes(exp.id);
+                return (
+                  <button key={exp.id} onClick={() => toggleExpansion(exp.id)}
+                    className={cn('w-full flex items-center gap-3 p-3 rounded-xl transition-all border', on ? 'bg-secondary border-foreground/30' : 'bg-card border-border hover:bg-secondary')}>
+                    <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center transition-all', on ? 'bg-primary border-primary' : 'border-input')}>
+                      {on && <Check className="h-3 w-3 text-primary-foreground" />}
+                    </div>
+                    <span className="text-sm text-foreground font-medium">{exp.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
         <div className="glass-card p-4">
-          <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-            <span>🎯</span> Jugador inicial
+          <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+            <Target className="h-4 w-4" /> Jugador inicial
           </h3>
           <button onClick={randomFirstPlayer}
-            className="w-full btn btn-primary bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 py-3.5 text-base shadow-lg shadow-violet-900/30">
-            🎲 Sortear jugador inicial
+            className="w-full btn btn-primary py-3.5 text-base">
+            <Dices className="h-5 w-5" /> Sortear jugador inicial
           </button>
           {firstPlayer && (
             <div className="mt-4 text-center">
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 px-5 py-2.5 rounded-full border border-amber-500/30">
-                <span className="text-lg">👑</span>
+              <div className="inline-flex items-center gap-2 bg-amber-100 text-amber-700 px-5 py-2.5 rounded-full border border-amber-200">
+                <Crown className="h-4 w-4" />
                 <span className="font-bold">{firstPlayer.name} empieza</span>
               </div>
             </div>
@@ -364,9 +349,8 @@ export default function PlaySession() {
           <div className="flex gap-2 mt-4 flex-wrap justify-center">
             {selectedPlayers.map(p => (
               <button key={p.id} onClick={() => setFirstPlayerId(p.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                  firstPlayerId === p.id ? 'text-white border-transparent' : 'bg-slate-800/60 text-[var(--text-secondary)] border-[var(--border)]'
-                }`} style={firstPlayerId === p.id ? { backgroundColor: p.color } : {}}>
+                className={cn('px-3 py-1.5 rounded-full text-xs font-semibold transition-all border', firstPlayerId === p.id ? 'text-white border-transparent' : 'bg-secondary text-muted-foreground border-border')}
+                style={firstPlayerId === p.id ? { backgroundColor: p.color } : {}}>
                 {p.name}
               </button>
             ))}
@@ -374,8 +358,8 @@ export default function PlaySession() {
         </div>
 
         <button onClick={() => setStep('scoring')}
-          className="w-full btn btn-primary py-3.5 text-base shadow-lg shadow-violet-900/40">
-          Empezar partida 🚀
+          className="w-full btn btn-primary py-3.5 text-base">
+          <Rocket className="h-5 w-5" /> Empezar partida
         </button>
       </div>
     );
@@ -397,9 +381,9 @@ export default function PlaySession() {
             </div>
           ) : null}
           <div>
-            <span className="text-sm text-white font-bold">{selectedGame?.name}</span>
+            <span className="text-sm text-foreground font-bold">{selectedGame?.name}</span>
             {activeExpansionIds.length > 0 && (
-              <span className="text-xs text-violet-300 block">
+              <span className="text-xs text-muted-foreground block">
                 + {activeExpansionIds.map(id => games.find(g => g.id === id)?.name).join(', ')}
               </span>
             )}
@@ -407,12 +391,12 @@ export default function PlaySession() {
         </div>
 
         {hasSpecialVictory && allSpecialVictoryTypes.length > 0 && (
-          <div className="glass-card p-4 border-amber-500/20 bg-amber-500/5">
-            <h3 className="text-amber-400 font-bold text-sm mb-2 flex items-center gap-2"><span>⚡</span> Victoria especial</h3>
-            <p className="text-xs text-[var(--text-secondary)] mb-3">Si alguien ganó por una condición especial, selecciónalo. No será necesario introducir puntos.</p>
+          <div className="glass-card p-4 border-amber-200 bg-amber-50">
+            <h3 className="text-amber-700 font-bold text-sm mb-2 flex items-center gap-2">⚡ Victoria especial</h3>
+            <p className="text-xs text-muted-foreground mb-3">Si alguien ganó por una condición especial, selecciónalo. No será necesario introducir puntos.</p>
             {selectedPlayers.map(player => (
               <div key={player.id} className="mb-3">
-                <p className="text-xs text-white font-semibold mb-1.5">{player.name}</p>
+                <p className="text-xs text-foreground font-semibold mb-1.5">{player.name}</p>
                 <div className="flex gap-1.5 flex-wrap">
                   {allSpecialVictoryTypes.map(svt => (
                     <button key={svt} onClick={() => setSpecialVictory(player.id, svt)}
@@ -431,12 +415,12 @@ export default function PlaySession() {
             {selectedPlayers.map(player => (
               <div key={player.id} className="glass-card p-4">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md"
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
                     style={{ backgroundColor: player.color }}>
                     {player.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-white font-bold text-sm">{player.name}</span>
-                  <span className="ml-auto text-xl font-black text-violet-300">{getPlayerTotal(player.id)}</span>
+                  <span className="text-foreground font-bold text-sm">{player.name}</span>
+                  <span className="ml-auto text-xl font-black text-foreground tabular-nums">{getPlayerTotal(player.id)}</span>
                 </div>
 
                 {isSimple ? (
@@ -448,7 +432,7 @@ export default function PlaySession() {
                   <div className="grid grid-cols-2 gap-2">
                     {allCategories.map((cat: ScoreCategory) => (
                       <div key={cat.id}>
-                        <label className="text-[10px] font-semibold text-[var(--text-muted)] mb-0.5 block truncate">{cat.name}</label>
+                        <label className="text-[10px] font-semibold text-muted-foreground mb-0.5 block truncate">{cat.name}</label>
                         <input type="number" inputMode="numeric" value={playerScores[player.id]?.[cat.id] ?? ''}
                           onChange={e => updateScore(player.id, cat.id, parseInt(e.target.value) || 0)}
                           className="input-field text-center text-sm py-2" />
@@ -463,12 +447,12 @@ export default function PlaySession() {
 
         {!hasAnySpecialVictory && (
           <div className="glass-card p-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">Ganador</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Ganador</h3>
             <div className="flex gap-2 flex-wrap">
               {selectedPlayers.map(p => (
                 <button key={p.id} onClick={() => setWinnerId(winnerId === p.id ? '' : p.id)}
                   className={`chip ${(winnerId || determineWinner()) === p.id ? 'bg-amber-500 text-white border-transparent' : ''}`}>
-                  👑 {p.name} ({getPlayerTotal(p.id)})
+                  <Crown className="h-3 w-3" /> {p.name} ({getPlayerTotal(p.id)})
                 </button>
               ))}
             </div>
@@ -476,8 +460,8 @@ export default function PlaySession() {
         )}
 
         <button onClick={handleFinish}
-          className="w-full btn btn-success py-3.5 text-base shadow-lg shadow-emerald-900/30">
-          ✅ Guardar partida
+          className="w-full btn btn-success py-3.5 text-base">
+          <Check className="h-5 w-5" /> Guardar partida
         </button>
       </div>
     );

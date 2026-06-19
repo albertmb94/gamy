@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Crown, Pencil, Trash2, Save, X, Target, ScrollText } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { cn } from '../utils/cn';
 
 const GAME_EMOJIS: Record<string, string> = {
   'Estrategia': '♟️', 'Cartas': '🃏', 'Filler': '⚡', 'Cooperativo': '🤝',
@@ -72,8 +74,8 @@ export default function History() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-extrabold text-white">Historial</h2>
-        <p className="text-sm text-[var(--text-secondary)]">{matches.length} partidas registradas</p>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">Historial</h2>
+        <p className="text-sm text-muted-foreground">{matches.length} partidas registradas</p>
       </div>
 
       {/* Filters */}
@@ -101,25 +103,25 @@ export default function History() {
 
           return (
             <button key={match.id} onClick={() => setDetailId(match.id)}
-              className="w-full glass-card p-4 text-left hover:ring-1 hover:ring-violet-500/40 transition-all animate-slide-up">
+              className="w-full glass-card p-4 text-left hover:border-foreground/30 transition-colors animate-slide-up">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-lg">{emoji}</span>
-                  <span className="text-white font-bold text-sm truncate">{game?.name || 'Desconocido'}</span>
+                  <span className="text-foreground font-bold text-sm truncate">{game?.name || 'Desconocido'}</span>
                 </div>
-                <span className="text-xs text-[var(--text-muted)] shrink-0">{formatDate(match.date)}</span>
+                <span className="text-xs text-muted-foreground shrink-0">{formatDate(match.date)}</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 {winner && (
-                  <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">👑 {winner.name}</span>
+                  <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1"><Crown className="h-3 w-3" /> {winner.name}</span>
                 )}
                 {match.activeExpansionIds.length > 0 && (
-                  <span className="text-[10px] text-violet-300 bg-violet-500/10 px-2 py-0.5 rounded-full border border-violet-500/20">
+                  <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full border border-border">
                     +{match.activeExpansionIds.map(id => games.find(g => g.id === id)?.name).join(', ')}
                   </span>
                 )}
                 {!match.synced && (
-                  <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 ml-auto">⏳ Sin sincronizar</span>
+                  <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 ml-auto">⏳ Sin sincronizar</span>
                 )}
               </div>
               <div className="flex gap-1.5 flex-wrap">
@@ -127,9 +129,8 @@ export default function History() {
                   const p = players.find(pl => pl.id === pid);
                   const score = match.playerScores.find(ps => ps.playerId === pid);
                   return p ? (
-                    <span key={pid} className={`text-[10px] px-2 py-1 rounded-full font-semibold border ${
-                      pid === match.winnerId ? 'text-white border-white/20' : 'text-slate-300 bg-slate-800/60 border-[var(--border)]'
-                    }`} style={pid === match.winnerId ? { backgroundColor: p.color } : {}}>
+                    <span key={pid} className={cn('text-[10px] px-2 py-1 rounded-full font-semibold border', pid === match.winnerId ? 'text-white border-transparent' : 'text-muted-foreground bg-secondary border-border')}
+                      style={pid === match.winnerId ? { backgroundColor: p.color } : {}}>
                       {p.name}: {score?.specialVictory || score?.total}
                     </span>
                   ) : null;
@@ -142,8 +143,8 @@ export default function History() {
 
       {filteredMatches.length === 0 && (
         <div className="text-center py-16 glass-card">
-          <p className="text-5xl mb-4">📋</p>
-          <p className="text-[var(--text-secondary)] font-medium">No hay partidas registradas</p>
+          <ScrollText className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+          <p className="text-muted-foreground font-medium">No hay partidas registradas</p>
         </div>
       )}
 
@@ -153,20 +154,20 @@ export default function History() {
           <div className="modal-panel p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h2 className="text-xl font-extrabold text-white">{detailGame.name}</h2>
-                <p className="text-sm text-[var(--text-secondary)]">{formatDate(detailMatch.date)}</p>
+                <h2 className="text-xl font-bold text-foreground">{detailGame.name}</h2>
+                <p className="text-sm text-muted-foreground">{formatDate(detailMatch.date)}</p>
                 {detailMatch.activeExpansionIds.length > 0 && (
-                  <p className="text-xs text-violet-300 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     + {detailMatch.activeExpansionIds.map(id => games.find(g => g.id === id)?.name).join(', ')}
                   </p>
                 )}
               </div>
-              <button onClick={() => { setDetailId(null); setEditingScores(null); }} className="w-8 h-8 rounded-full bg-slate-800 text-[var(--text-muted)] hover:text-white flex items-center justify-center transition-colors">✕</button>
+              <button onClick={() => { setDetailId(null); setEditingScores(null); }} className="w-8 h-8 rounded-full bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"><X className="h-4 w-4" /></button>
             </div>
 
             {detailMatch.firstPlayerId && (
-              <p className="text-xs text-[var(--text-secondary)] mb-3">
-                🎯 Primer turno: <span className="text-white font-semibold">{players.find(p => p.id === detailMatch.firstPlayerId)?.name}</span>
+              <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
+                <Target className="h-3.5 w-3.5" /> Primer turno: <span className="text-foreground font-semibold">{players.find(p => p.id === detailMatch.firstPlayerId)?.name}</span>
               </p>
             )}
 
@@ -184,17 +185,15 @@ export default function History() {
                   });
 
                   return (
-                    <div key={ps.playerId} className={`rounded-xl p-3 border ${
-                      ps.playerId === detailMatch.winnerId ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-800/40 border-[var(--border)]'
-                    }`}>
+                    <div key={ps.playerId} className={cn('rounded-xl p-3 border', ps.playerId === detailMatch.winnerId ? 'bg-amber-50 border-amber-200' : 'bg-secondary border-border')}>
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-lg">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}</span>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md"
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
                           style={{ backgroundColor: player.color }}>
                           {player.name.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-white font-bold text-sm flex-1">{player.name}</span>
-                        <span className="text-lg font-black text-white">
+                        <span className="text-foreground font-bold text-sm flex-1">{player.name}</span>
+                        <span className="text-lg font-black text-foreground">
                           {ps.specialVictory ? `⚡ ${ps.specialVictory}` : ps.total}
                         </span>
                       </div>
@@ -203,7 +202,7 @@ export default function History() {
                         <div className="grid grid-cols-3 gap-1">
                           {allCats.map(cat => (
                             <div key={cat.id} className="text-center">
-                              <span className="text-[10px] text-[var(--text-muted)] block truncate">{cat.name}</span>
+                              <span className="text-[10px] text-muted-foreground block truncate">{cat.name}</span>
                               {editingScores ? (
                                 <input type="number" inputMode="numeric"
                                   value={editingScores[ps.playerId]?.[cat.id] ?? 0}
@@ -213,7 +212,7 @@ export default function History() {
                                   }) : null)}
                                   className="w-full input-field text-center px-1 py-1 text-xs" />
                               ) : (
-                                <span className="text-xs text-white font-bold">{ps.scores[cat.id] || 0}</span>
+                                <span className="text-xs text-foreground font-bold">{ps.scores[cat.id] || 0}</span>
                               )}
                             </div>
                           ))}
@@ -228,17 +227,17 @@ export default function History() {
               {editingScores ? (
                 <>
                   <button onClick={() => setEditingScores(null)} className="btn btn-secondary flex-1 py-3">Cancelar</button>
-                  <button onClick={saveEdit} className="btn btn-success flex-1 py-3">💾 Guardar</button>
+                  <button onClick={saveEdit} className="btn btn-success flex-1 py-3"><Save className="h-4 w-4" /> Guardar</button>
                 </>
               ) : (
                 <>
-                  <button onClick={startEdit} className="btn btn-secondary flex-1 py-3">✏️ Editar</button>
+                  <button onClick={startEdit} className="btn btn-secondary flex-1 py-3"><Pencil className="h-4 w-4" /> Editar</button>
                   <button onClick={() => {
                     if (confirm('¿Eliminar esta partida?')) {
                       deleteMatch(detailMatch.id);
                       setDetailId(null);
                     }
-                  }} className="btn btn-danger py-3 px-5">🗑️</button>
+                  }} className="btn btn-danger py-3 px-5"><Trash2 className="h-4 w-4" /></button>
                 </>
               )}
             </div>

@@ -67,8 +67,8 @@ export default function Stats() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-extrabold text-white">Estadísticas</h2>
-        <p className="text-sm text-[var(--text-secondary)]">Rankings, logros y más</p>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">Estadísticas</h2>
+        <p className="text-sm text-muted-foreground">Rankings, logros y más</p>
       </div>
 
       <div className="glass-card p-1">
@@ -81,7 +81,7 @@ export default function Stats() {
           ].map(({ key, label }) => (
             <button key={key} onClick={() => { setView(key as StatsView); setFilterGameId(''); setFilterType(''); setFilterExpansionId(''); }}
               className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                view === key ? 'bg-violet-600 text-white shadow-md shadow-violet-900/30' : 'text-[var(--text-muted)] hover:text-white'
+                view === key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}>
               {label}
             </button>
@@ -120,57 +120,57 @@ export default function Stats() {
       {view !== 'achievements' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Ranking</h3>
-            <span className="text-xs text-[var(--text-muted)] font-semibold">{filteredMatches.length} partidas</span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ranking</h3>
+            <span className="text-xs text-muted-foreground font-semibold">{filteredMatches.length} partidas</span>
           </div>
 
           {rankings.length === 0 ? (
             <div className="text-center py-12 glass-card">
-              <p className="text-[var(--text-secondary)]">No hay datos</p>
+              <p className="text-muted-foreground">No hay datos</p>
             </div>
           ) : (
             rankings.map((r, idx) => (
-              <div key={r.player.id} className={`glass-card p-4 ${idx === 0 && r.wins > 0 ? 'ring-1 ring-amber-500/30' : ''}`}>
+              <div key={r.player.id} className={`glass-card p-4 ${idx === 0 && r.wins > 0 ? 'ring-1 ring-amber-400/50' : ''}`}>
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-lg w-7 text-center">
                     {idx === 0 && r.wins > 0 ? '🥇' : idx === 1 && r.wins > 0 ? '🥈' : idx === 2 && r.wins > 0 ? '🥉' : `#${idx + 1}`}
                   </span>
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md"
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
                     style={{ backgroundColor: r.player.color }}>
                     {r.player.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-white font-bold text-sm truncate">{r.player.name}</h4>
-                    <p className="text-xs text-[var(--text-secondary)]">{r.total} partidas</p>
+                    <h4 className="text-foreground font-bold text-sm truncate">{r.player.name}</h4>
+                    <p className="text-xs text-muted-foreground">{r.total} partidas</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-white font-black text-lg">{r.wins}<span className="text-xs font-medium text-[var(--text-muted)]">W</span></p>
-                    <p className="text-xs text-[var(--text-secondary)] font-semibold">{r.winRate.toFixed(0)}%</p>
+                    <p className="text-foreground font-black text-lg">{r.wins}<span className="text-xs font-medium text-muted-foreground">W</span></p>
+                    <p className="text-xs text-muted-foreground font-semibold">{r.winRate.toFixed(0)}%</p>
                   </div>
                 </div>
 
                 {r.total > 0 && (
-                  <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden mb-3">
+                  <div className="h-2.5 bg-muted rounded-full overflow-hidden mb-3">
                     <div className="h-full rounded-full transition-all" style={{ width: `${r.winRate}%`, backgroundColor: r.player.color }} />
                   </div>
                 )}
 
                 <div className="grid grid-cols-4 gap-2 text-center">
-                  <div className="bg-slate-800/40 rounded-lg py-1.5">
-                    <p className="text-[10px] text-[var(--text-muted)]">Victorias</p>
-                    <p className="text-xs text-emerald-400 font-bold">{r.wins}</p>
+                  <div className="bg-secondary rounded-lg py-1.5">
+                    <p className="text-[10px] text-muted-foreground">Victorias</p>
+                    <p className="text-xs text-green-600 font-bold">{r.wins}</p>
                   </div>
-                  <div className="bg-slate-800/40 rounded-lg py-1.5">
-                    <p className="text-[10px] text-[var(--text-muted)]">Derrotas</p>
-                    <p className="text-xs text-rose-400 font-bold">{r.losses}</p>
+                  <div className="bg-secondary rounded-lg py-1.5">
+                    <p className="text-[10px] text-muted-foreground">Derrotas</p>
+                    <p className="text-xs text-red-600 font-bold">{r.losses}</p>
                   </div>
-                  <div className="bg-slate-800/40 rounded-lg py-1.5">
-                    <p className="text-[10px] text-[var(--text-muted)]">Pts/Partida</p>
-                    <p className="text-xs text-white font-bold">{r.avgPoints.toFixed(1)}</p>
+                  <div className="bg-secondary rounded-lg py-1.5">
+                    <p className="text-[10px] text-muted-foreground">Pts/Partida</p>
+                    <p className="text-xs text-foreground font-bold">{r.avgPoints.toFixed(1)}</p>
                   </div>
-                  <div className="bg-slate-800/40 rounded-lg py-1.5">
-                    <p className="text-[10px] text-[var(--text-muted)]">Racha</p>
-                    <p className="text-xs text-amber-400 font-bold">{r.bestStreak}🔥</p>
+                  <div className="bg-secondary rounded-lg py-1.5">
+                    <p className="text-[10px] text-muted-foreground">Racha</p>
+                    <p className="text-xs text-amber-600 font-bold">{r.bestStreak}🔥</p>
                   </div>
                 </div>
               </div>
@@ -182,7 +182,7 @@ export default function Stats() {
       {view === 'achievements' && (
         <div className="space-y-4">
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">Logros disponibles</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Logros disponibles</h3>
             <div className="space-y-3">
               {Object.entries(ACHIEVEMENTS_MAP).map(([id, info]) => {
                 const unlocked = playerAchievements.filter(a => a.achievementId === id);
@@ -191,8 +191,8 @@ export default function Stats() {
                     <div className="flex items-center gap-3">
                       <span className="text-3xl">{info.icon}</span>
                       <div className="flex-1">
-                        <h4 className="text-white font-bold text-sm">{info.name}</h4>
-                        <p className="text-xs text-[var(--text-secondary)]">{info.description}</p>
+                        <h4 className="text-foreground font-bold text-sm">{info.name}</h4>
+                        <p className="text-xs text-muted-foreground">{info.description}</p>
                       </div>
                     </div>
                     {unlocked.length > 0 ? (
@@ -200,7 +200,7 @@ export default function Stats() {
                         {unlocked.map(u => {
                           const player = players.find(p => p.id === u.playerId);
                           return player ? (
-                            <span key={u.playerId} className="text-xs px-2.5 py-1 rounded-full text-white font-semibold shadow-sm"
+                            <span key={u.playerId} className="text-xs px-2.5 py-1 rounded-full text-white font-semibold"
                               style={{ backgroundColor: player.color }}>
                               {player.name}
                             </span>
@@ -208,7 +208,7 @@ export default function Stats() {
                         })}
                       </div>
                     ) : (
-                      <p className="text-xs text-[var(--text-muted)] mt-3">Nadie ha desbloqueado este logro aún</p>
+                      <p className="text-xs text-muted-foreground mt-3">Nadie ha desbloqueado este logro aún</p>
                     )}
                   </div>
                 );
@@ -217,19 +217,19 @@ export default function Stats() {
           </div>
 
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">Logros por jugador</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Logros por jugador</h3>
             <div className="space-y-3">
               {players.map(player => {
                 const pAch = playerAchievements.filter(a => a.playerId === player.id);
                 return (
                   <div key={player.id} className="glass-card p-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md"
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
                         style={{ backgroundColor: player.color }}>
                         {player.name.charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-white font-bold text-sm">{player.name}</span>
-                      <span className="ml-auto text-xs font-bold text-[var(--text-muted)]">{pAch.length}/{Object.keys(ACHIEVEMENTS_MAP).length}</span>
+                      <span className="text-foreground font-bold text-sm">{player.name}</span>
+                      <span className="ml-auto text-xs font-bold text-muted-foreground">{pAch.length}/{Object.keys(ACHIEVEMENTS_MAP).length}</span>
                     </div>
                     <div className="flex gap-3">
                       {Object.entries(ACHIEVEMENTS_MAP).map(([id, info]) => {

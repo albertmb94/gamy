@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Plus, Pencil, Trash2, Check, Users } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { cn } from '../utils/cn';
 
 const COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316', '#14B8A6', '#6366F1'];
 
@@ -26,8 +28,8 @@ export default function Players() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-extrabold text-white">Jugadores</h2>
-        <p className="text-sm text-[var(--text-secondary)]">{players.length} registrados</p>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">Jugadores</h2>
+        <p className="text-sm text-muted-foreground">{players.length} registrados</p>
       </div>
 
       <div className="glass-card p-4 space-y-4">
@@ -35,14 +37,14 @@ export default function Players() {
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nombre del jugador"
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
             className="input-field flex-1" />
-          <button onClick={handleAdd} className="btn btn-primary px-5">+</button>
+          <button onClick={handleAdd} className="btn btn-primary px-5"><Plus className="h-4 w-4" /></button>
         </div>
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">Color</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Color</p>
           <div className="flex gap-2 flex-wrap">
             {COLORS.map(c => (
               <button key={c} onClick={() => setSelectedColor(c)}
-                className={`w-9 h-9 rounded-full transition-all ${selectedColor === c ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110' : 'opacity-60 hover:opacity-100'}`}
+                className={cn('w-9 h-9 rounded-full transition-all', selectedColor === c ? 'ring-2 ring-foreground ring-offset-2 ring-offset-background scale-110' : 'opacity-60 hover:opacity-100')}
                 style={{ backgroundColor: c }} />
             ))}
           </div>
@@ -59,7 +61,7 @@ export default function Players() {
           return (
             <div key={player.id} className="glass-card p-4 animate-slide-up">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl shrink-0 shadow-lg"
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl shrink-0"
                   style={{ backgroundColor: player.color }}>
                   {player.name.charAt(0).toUpperCase()}
                 </div>
@@ -70,28 +72,28 @@ export default function Players() {
                         className="input-field flex-1 text-sm py-1.5"
                         autoFocus onKeyDown={e => { if (e.key === 'Enter') { updatePlayer(player.id, { name: editName }); setEditId(null); } }} />
                       <button onClick={() => { updatePlayer(player.id, { name: editName }); setEditId(null); }}
-                        className="btn btn-success px-3 py-1.5">✓</button>
+                        className="btn btn-success px-3 py-1.5"><Check className="h-4 w-4" /></button>
                     </div>
                   ) : (
-                    <h3 className="text-white font-bold truncate">{player.name}</h3>
+                    <h3 className="text-foreground font-bold truncate">{player.name}</h3>
                   )}
-                  <div className="flex gap-3 text-xs text-[var(--text-secondary)] mt-1 font-medium">
+                  <div className="flex gap-3 text-xs text-muted-foreground mt-1 font-medium">
                     <span>{playerMatches.length} partidas</span>
-                    <span className="text-emerald-400">{wins} victorias</span>
+                    <span className="text-green-600">{wins} victorias</span>
                     <span>{winRate}%</span>
                   </div>
                 </div>
                 <div className="flex gap-1">
                   <button onClick={() => { setEditId(player.id); setEditName(player.name); }}
-                    className="text-[var(--text-muted)] hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors text-sm">✏️</button>
+                    className="text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-secondary transition-colors"><Pencil className="h-4 w-4" /></button>
                   <button onClick={() => { if (confirm(`¿Eliminar a ${player.name}?`)) deletePlayer(player.id); }}
-                    className="text-[var(--text-muted)] hover:text-rose-400 p-2 rounded-lg hover:bg-slate-800 transition-colors text-sm">🗑️</button>
+                    className="text-muted-foreground hover:text-destructive p-2 rounded-lg hover:bg-secondary transition-colors"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </div>
 
               {playerMatches.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-[var(--border)]">
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div className="mt-3 pt-3 border-t border-border">
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: `${winRate}%`, backgroundColor: player.color }} />
                   </div>
                 </div>
@@ -102,7 +104,7 @@ export default function Players() {
                   {pAchievements.map(a => {
                     const info = ACHIEVEMENTS_MAP[a.achievementId];
                     return info ? (
-                      <span key={a.achievementId} className="text-xs bg-amber-500/15 text-amber-400 px-2 py-1 rounded-lg border border-amber-500/20" title={info.description}>
+                      <span key={a.achievementId} className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg border border-amber-200" title={info.description}>
                         {info.icon} {info.name}
                       </span>
                     ) : null;
@@ -116,8 +118,8 @@ export default function Players() {
 
       {players.length === 0 && (
         <div className="text-center py-16 glass-card">
-          <p className="text-5xl mb-4">👤</p>
-          <p className="text-[var(--text-secondary)] font-medium">Añade jugadores para empezar</p>
+          <Users className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+          <p className="text-muted-foreground font-medium">Añade jugadores para empezar</p>
         </div>
       )}
     </div>

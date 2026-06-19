@@ -22,3 +22,6 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Copia de referencia del repo brisca-app (no forma parte del repo de gamy)
+brisca-app/
