@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Plus, Minus, ArrowLeft } from 'lucide-react';
+import { Plus, ArrowLeft, Check, Trash2, Users } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useRemigioStore } from '../../store/useRemigioStore';
+import { cn } from '../../utils/cn';
 
 const SETTINGS_KEY = 'remigio-defaults';
 
@@ -13,8 +14,14 @@ interface Defaults {
   pricePerRound: number;
   pricePerGame: number;
   pricePerReentry: number;
-  playerNames: string[];
 }
+
+const base: Defaults = {
+  targetScore: 100,
+  pricePerRound: 0,
+  pricePerGame: 0,
+  pricePerReentry: 0,
+};
 
 function loadDefaults(): Defaults {
   try {
@@ -26,16 +33,8 @@ function loadDefaults(): Defaults {
   return base;
 }
 
-const base: Defaults = {
-  targetScore: 100,
-  pricePerRound: 0,
-  pricePerGame: 0,
-  pricePerReentry: 0,
-  playerNames: [],
-};
-
 export function RemigioNew() {
-  const { create, openSession, goList } = useRemigioStore();
+  const { create, openSession, goList, roster, addRosterPlayer, removeRosterPlayer } = useRemigioStore();
   const defaults = loadDefaults();
 
   const [name, setName] = useState('');
@@ -44,25 +43,43 @@ export function RemigioNew() {
   const [pricePerRound, setPricePerRound] = useState(defaults.pricePerRound);
   const [pricePerGame, setPricePerGame] = useState(defaults.pricePerGame);
   const [pricePerReentry, setPricePerReentry] = useState(defaults.pricePerReentry);
-  const [names, setNames] = useState<string[]>(
-    defaults.playerNames.length >= 2 ? defaults.playerNames : ['', '', ''],
-  );
+  // Por defecto, todos los jugadores habituales quedan seleccionados.
+  const [selected, setSelected] = useState<string[]>(roster);
+  const [newPlayer, setNewPlayer] = useState('');
 
-  const setNameAt = (i: number, v: string) => setNames((arr) => arr.map((n, idx) => (idx === i ? v : n)));
-  const addPlayer = () => setNames((arr) => (arr.length < 8 ? [...arr, ''] : arr));
-  const removePlayer = () => setNames((arr) => (arr.length > 2 ? arr.slice(0, -1) : arr));
+  const toggle = (n: string) =>
+    setSelected((arr) => (arr.includes(n) ? arr.filter((x) => x !== n) : [...arr, n]));
+
+  const handleAddPlayer = () => {
+    const trimmed = newPlayer.trim();
+    if (!trimmed) return;
+    if (roster.some((n) => n.toLowerCase() === trimmed.toLowerCase())) {
+      // Ya existe: simplemente asegúrate de que queda seleccionado.
+      const existing = roster.find((n) => n.toLowerCase() === trimmed.toLowerCase())!;
+      setSelected((arr) => (arr.includes(existing) ? arr : [...arr, existing]));
+    } else {
+      addRosterPlayer(trimmed);
+      setSelected((arr) => [...arr, trimmed]);
+    }
+    setNewPlayer('');
+  };
+
+  const handleRemovePlayer = (n: string) => {
+    removeRosterPlayer(n);
+    setSelected((arr) => arr.filter((x) => x !== n));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanNames = names.map((n) => n.trim()).filter(Boolean);
+    const cleanNames = selected.map((n) => n.trim()).filter(Boolean);
     if (cleanNames.length < 2) {
-      alert('Añade al menos 2 jugadores');
+      alert('Selecciona al menos 2 jugadores');
       return;
     }
     try {
       localStorage.setItem(
         SETTINGS_KEY,
-        JSON.stringify({ targetScore, pricePerRound, pricePerGame, pricePerReentry, playerNames: cleanNames }),
+        JSON.stringify({ targetScore, pricePerRound, pricePerGame, pricePerReentry }),
       );
     } catch {
       /* ignore */
@@ -129,30 +146,75 @@ export function RemigioNew() {
         <Card>
           <CardHeader>
             <CardTitle>Jugadores</CardTitle>
-            <CardDescription>Añade los nombres de los jugadores.</CardDescription>
+            <CardDescription>
+              Selecciona quién juega. Añade o elimina jugadores habituales; quedan guardados para próximas partidas.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {names.map((n, i) => (
-              <div key={i} className="space-y-2">
-                <Label htmlFor={`player-${i}`}>Jugador {i + 1}</Label>
-                <Input id={`player-${i}`} value={n} onChange={(e) => setNameAt(i, e.target.value)} placeholder={`Nombre del jugador ${i + 1}`} required={i < 2} />
-              </div>
-            ))}
-            <div className="flex gap-2 pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={removePlayer} disabled={names.length <= 2}>
-                <Minus className="h-4 w-4" />
-                Quitar
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={addPlayer} disabled={names.length >= 8}>
+            <div className="flex gap-2">
+              <Input
+                value={newPlayer}
+                onChange={(e) => setNewPlayer(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddPlayer(); } }}
+                placeholder="Nombre del jugador"
+              />
+              <Button type="button" variant="outline" size="icon" onClick={handleAddPlayer} aria-label="Añadir jugador">
                 <Plus className="h-4 w-4" />
-                Añadir
               </Button>
             </div>
+
+            {roster.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                <Users className="h-8 w-8 mb-2" />
+                <p className="text-sm">Aún no hay jugadores. Añade el primero arriba.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {roster.map((n) => {
+                  const sel = selected.includes(n);
+                  return (
+                    <div key={n} className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggle(n)}
+                        className={cn(
+                          'flex flex-1 items-center gap-3 rounded-xl border p-3 text-left transition-all',
+                          sel ? 'bg-secondary border-foreground/30 ring-1 ring-foreground/15' : 'bg-card border-border hover:bg-secondary',
+                        )}
+                      >
+                        <span
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground"
+                        >
+                          {n.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="flex-1 font-medium text-foreground">{n}</span>
+                        {sel && (
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                      </button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemovePlayer(n)}
+                        title={`Eliminar a ${n}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground">{selected.length} seleccionados</p>
           </CardContent>
         </Card>
 
         <div className="flex justify-end">
-          <Button type="submit" size="lg">Crear Partida</Button>
+          <Button type="submit" size="lg" disabled={selected.length < 2}>Crear Partida</Button>
         </div>
       </form>
     </div>

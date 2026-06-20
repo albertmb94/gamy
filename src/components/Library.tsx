@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, SlidersHorizontal, Heart, X, Pencil, Trash2, Package, Spade, ChevronRight } from 'lucide-react';
+import { Search, Plus, SlidersHorizontal, Heart, X, Pencil, Trash2, Package, Spade, ChevronRight, Dices } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useRemigioStore } from '../store/useRemigioStore';
 import { Game, GameType, ScoringTemplate, ScoreCategory } from '../types';
@@ -294,7 +294,7 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
 
 // ---- Game Detail ----
 function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
-  const { games, matches, players, deleteGame, setEditingGameId, setShowGameForm, toggleFavorite } = useStore();
+  const { games, matches, players, deleteGame, setEditingGameId, setShowGameForm, toggleFavorite, setSelectedGameId, setTab } = useStore();
   const expansions = games.filter(g => g.baseGameId === game.id);
   const baseGame = game.isExpansion ? games.find(g => g.id === game.baseGameId) : null;
   const gameMatches = matches.filter(m => m.gameId === game.id);
@@ -302,6 +302,12 @@ function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
   const handleEdit = () => {
     setEditingGameId(game.id);
     setShowGameForm(true);
+  };
+
+  const handlePlay = () => {
+    setSelectedGameId(game.id);
+    setTab('play');
+    onClose();
   };
 
   const handleDelete = () => {
@@ -396,7 +402,10 @@ function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
             </div>
           </div>
 
-          <div className="flex gap-3 mt-5">
+          <button onClick={handlePlay} className="btn btn-primary w-full py-3.5 text-base mt-5">
+            <Dices className="h-5 w-5" /> Iniciar partida
+          </button>
+          <div className="flex gap-3 mt-3">
             <button onClick={handleEdit} className="btn btn-secondary flex-1 py-3"><Pencil className="h-4 w-4" /> Editar</button>
             <button onClick={handleDelete} className="btn btn-danger py-3 px-5"><Trash2 className="h-4 w-4" /></button>
           </div>

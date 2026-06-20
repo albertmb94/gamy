@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, X, Dices, Check, Crown, Package, Target, Rocket } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { PlayerScore, ScoreCategory } from '../types';
@@ -34,8 +34,20 @@ function StepHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
 
 export default function PlaySession() {
   const { games, players, addMatch, setTab } = useStore();
+  const preselectedGameId = useStore((s) => s.selectedGameId);
+  const setPreselectedGameId = useStore((s) => s.setSelectedGameId);
   const [step, setStep] = useState<PlayStep>('selectGame');
   const [selectedGameId, setSelectedGameId] = useState('');
+
+  // Permite iniciar una partida directamente desde la Ludoteca: si hay un juego
+  // preseleccionado en el store, se salta el paso de selección de juego.
+  useEffect(() => {
+    if (preselectedGameId && games.some((g) => g.id === preselectedGameId)) {
+      setSelectedGameId(preselectedGameId);
+      setStep('selectPlayers');
+      setPreselectedGameId(null);
+    }
+  }, [preselectedGameId, games, setPreselectedGameId]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [activeExpansionIds, setActiveExpansionIds] = useState<string[]>([]);
   const [firstPlayerId, setFirstPlayerId] = useState('');

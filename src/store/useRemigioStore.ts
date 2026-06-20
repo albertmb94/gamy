@@ -14,9 +14,36 @@ import { remigioSeed } from '../remigio/seed';
 
 export type RemigioScreen = 'list' | 'new' | 'session';
 
+const ROSTER_KEY = 'remigio-roster';
+
+function loadRoster(): string[] {
+  try {
+    const raw = localStorage.getItem(ROSTER_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter((n) => typeof n === 'string');
+    }
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
+function saveRoster(roster: string[]) {
+  try {
+    localStorage.setItem(ROSTER_KEY, JSON.stringify(roster));
+  } catch {
+    /* ignore */
+  }
+}
+
 interface RemigioState {
   sessions: RemigioSession[];
   hydrated: boolean;
+
+  // Jugadores habituales de Remigio, gestionados desde el menú del juego.
+  // Aparecen al crear una partida para seleccionarlos rápidamente.
+  roster: string[];
 
   // Navegación del módulo Remigio (overlay a pantalla completa).
   open: boolean;
@@ -30,6 +57,9 @@ interface RemigioState {
   goList: () => void;
   goNew: () => void;
   openSession: (id: string) => void;
+
+  addRosterPlayer: (name: string) => void;
+  removeRosterPlayer: (name: string) => void;
 
   create: (config: NewSessionConfig) => string;
   addRound: (sessionId: string, points: { playerId: string; points: number }[]) => void;
@@ -64,6 +94,7 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
   return {
     sessions: [],
     hydrated: false,
+    roster: loadRoster(),
     open: false,
     screen: 'list',
     activeSessionId: null,
@@ -115,6 +146,25 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
     goList: () => set({ screen: 'list', activeSessionId: null }),
     goNew: () => set({ screen: 'new' }),
     openSession: (id) => set({ screen: 'session', activeSessionId: id }),
+
+    addRosterPlayer: (name) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      set((s) => {
+        if (s.roster.some((n) => n.toLowerCase() === trimmed.toLowerCase())) return s;
+        const roster = [...s.roster, trimmed];
+        saveRoster(roster);
+        return { roster };
+      });
+    },
+
+    removeRosterPlayer: (name) => {
+      set((s) => {
+        const roster = s.roster.filter((n) => n.toLowerCase() !== name.toLowerCase());
+        saveRoster(roster);
+        return { roster };
+      });
+    },
 
     create: (config) => {
       const session = createSession(config);

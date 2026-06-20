@@ -10,7 +10,7 @@ export function RemigioModule() {
 
   return (
     <div className="fixed inset-0 z-[60] bg-background flex flex-col">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur px-4 py-3 flex items-center justify-between">
+      <header className="shrink-0 z-10 border-b border-border bg-background/95 backdrop-blur px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
             <Spade className="h-5 w-5" />
@@ -29,7 +29,7 @@ export function RemigioModule() {
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 py-6 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+      <main className="flex-1 min-h-0 overflow-y-auto px-4 py-6 pb-[calc(2rem+env(safe-area-inset-bottom))]">
         <div className="max-w-3xl mx-auto animate-fade-in">
           {screen === 'list' && <RemigioList />}
           {screen === 'new' && <RemigioNew />}

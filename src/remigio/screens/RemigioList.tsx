@@ -1,10 +1,13 @@
-import { PlusCircle, Users, Trophy, Pause, Play, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { PlusCircle, Users, Trophy, Pause, Play, Trash2, Plus, ChevronDown } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import { useRemigioStore } from '../../store/useRemigioStore';
 import { statusLabel } from '../engine';
 import { RemigioSession } from '../types';
+import { cn } from '../../utils/cn';
 
 function SessionCard({ session, onOpen, onDelete }: { session: RemigioSession; onOpen: () => void; onDelete: () => void }) {
   const finished = session.status === 'finished';
@@ -46,6 +49,76 @@ function SessionCard({ session, onOpen, onDelete }: { session: RemigioSession; o
   );
 }
 
+function RosterManager() {
+  const { roster, addRosterPlayer, removeRosterPlayer } = useRemigioStore();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+
+  const handleAdd = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    addRosterPlayer(trimmed);
+    setName('');
+  };
+
+  return (
+    <Card>
+      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full text-left">
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users className="h-4 w-4" /> Jugadores habituales
+            </CardTitle>
+            <CardDescription className="mt-1">
+              {roster.length} guardados · aparecen al crear partida
+            </CardDescription>
+          </div>
+          <ChevronDown className={cn('h-5 w-5 text-muted-foreground transition-transform', open && 'rotate-180')} />
+        </CardHeader>
+      </button>
+      {open && (
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
+              placeholder="Nombre del jugador"
+            />
+            <Button type="button" variant="outline" size="icon" onClick={handleAdd} aria-label="Añadir jugador">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {roster.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Añade jugadores para reutilizarlos en tus partidas.</p>
+          ) : (
+            <div className="space-y-2">
+              {roster.map((n) => (
+                <div key={n} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    {n.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="flex-1 font-medium text-foreground">{n}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeRosterPlayer(n)}
+                    title={`Eliminar a ${n}`}
+                  >
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 export function RemigioList() {
   const { sessions, goNew, openSession, remove } = useRemigioStore();
   const active = sessions.filter((s) => s.status !== 'finished');
@@ -67,6 +140,8 @@ export function RemigioList() {
           Nueva Partida
         </Button>
       </div>
+
+      <RosterManager />
 
       {active.length > 0 && (
         <div className="space-y-4">

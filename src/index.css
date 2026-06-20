@@ -117,8 +117,9 @@ body {
 #root {
   width: 100%;
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  /* El scroll lo gestiona el <main> de cada pantalla (un único scroll por
+     pantalla). #root queda fijo para evitar scrolls anidados en móvil. */
+  overflow: hidden;
   overscroll-behavior-y: contain;
 }
 

@@ -47,9 +47,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="h-full flex flex-col bg-background text-foreground">
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75 px-4 py-3 flex items-center justify-between">
+      <header className="shrink-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
             <Gamepad2 className="h-5 w-5" />
@@ -67,8 +67,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 px-4 py-5 pb-28 overflow-y-auto overflow-x-hidden">
+      {/* Main Content — único contenedor con scroll de la pantalla */}
+      <main className="flex-1 min-h-0 px-4 py-5 pb-28 overflow-y-auto overflow-x-hidden">
         <div className="max-w-3xl mx-auto animate-fade-in">{tabContent()}</div>
       </main>
 
