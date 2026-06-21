@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { RemigioSession } from '../remigio/types';
-import { applyRound, createSession, NewSessionConfig } from '../remigio/engine';
+import { applyRound, createSession, editLastRound, NewSessionConfig } from '../remigio/engine';
 import {
   loadRemigioSessions,
   saveRemigioSession,
@@ -34,6 +34,7 @@ interface RemigioState {
 
   create: (config: NewSessionConfig) => string;
   addRound: (sessionId: string, points: { playerId: string; points: number }[]) => void;
+  updateLastRound: (sessionId: string, points: { playerId: string; points: number }[]) => void;
   setStatus: (sessionId: string, status: RemigioSession['status']) => void;
   remove: (id: string) => void;
 }
@@ -131,6 +132,19 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
         const sessions = s.sessions.map((sess) => {
           if (sess.id !== sessionId) return sess;
           updated = applyRound(sess, points);
+          return updated;
+        });
+        return { sessions };
+      });
+      if (updated) persistAndPush(updated);
+    },
+
+    updateLastRound: (sessionId, points) => {
+      let updated: RemigioSession | null = null;
+      set((s) => {
+        const sessions = s.sessions.map((sess) => {
+          if (sess.id !== sessionId) return sess;
+          updated = editLastRound(sess, points);
           return updated;
         });
         return { sessions };

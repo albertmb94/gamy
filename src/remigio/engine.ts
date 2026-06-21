@@ -202,6 +202,66 @@ export function lastRound(session: RemigioSession) {
   return session.rounds.reduce((max, r) => (r.round_number > max.round_number ? r : max), session.rounds[0]);
 }
 
+/**
+ * Reconstruye el estado inicial de una partida justo antes de que se
+ * aplicara ninguna ronda. Conserva la configuración y los nombres de los
+ * jugadores, pero reinicia puntuaciones, estados y transacciones.
+ */
+function getInitialSessionState(session: RemigioSession): RemigioSession {
+  return {
+    ...clone(session),
+    status: 'waiting',
+    ended_at: undefined,
+    winner_id: undefined,
+    players: session.players.map((p) => ({
+      ...p,
+      current_score: 0,
+      status: 'active' as const,
+      reentry_count: 0,
+      total_rounds_won: 0,
+    })),
+    rounds: [],
+    transactions: [],
+    synced: false,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * Reconstruye la partida aplicando únicamente las rondas indicadas.
+ * Útil para corregir errores de introducción recalculando todo el estado
+ * desde el principio.
+ */
+export function replaySession(
+  session: RemigioSession,
+  rounds: RemigioSession['rounds'],
+): RemigioSession {
+  let rebuilt = getInitialSessionState(session);
+  for (const round of rounds) {
+    const points = round.scores.map((s) => ({
+      playerId: s.game_player_id,
+      points: s.points,
+    }));
+    rebuilt = applyRound(rebuilt, points);
+  }
+  return rebuilt;
+}
+
+/**
+ * Sustituye la última ronda por unos nuevos puntos y recalcula toda la
+ * partida desde el principio. Devuelve la sesión tal quedaría con la
+ * corrección aplicada.
+ */
+export function editLastRound(
+  prev: RemigioSession,
+  newPoints: { playerId: string; points: number }[],
+): RemigioSession {
+  if (prev.rounds.length === 0) return clone(prev);
+  const roundsToKeep = prev.rounds.slice(0, -1);
+  const rebuilt = replaySession(prev, roundsToKeep);
+  return applyRound(rebuilt, newPoints);
+}
+
 export interface RemigioRoundSummaryRow {
   player: RemigioPlayer;
   paid: number;
