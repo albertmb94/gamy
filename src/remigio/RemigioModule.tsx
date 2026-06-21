@@ -1,12 +1,15 @@
-import { X, Spade } from 'lucide-react';
+import { X, Spade, Settings as SettingsIcon } from 'lucide-react';
 import { useRemigioStore } from '../store/useRemigioStore';
 import { RemigioList } from './screens/RemigioList';
 import { RemigioNew } from './screens/RemigioNew';
 import { RemigioSession } from './screens/RemigioSession';
+import { RemigioSettings } from './screens/RemigioSettings';
 
 export function RemigioModule() {
-  const { open, screen, activeSessionId, closeModule } = useRemigioStore();
+  const { open, screen, activeSessionId, closeModule, goSettings } = useRemigioStore();
   if (!open) return null;
+
+  const showSettingsButton = screen === 'list' || screen === 'new';
 
   return (
     <div className="fixed inset-0 z-[60] bg-background flex flex-col">
@@ -20,19 +23,33 @@ export function RemigioModule() {
             <p className="text-[11px] text-muted-foreground mt-0.5">Integrado en Gamy</p>
           </div>
         </div>
-        <button
-          onClick={closeModule}
-          className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
-          title="Volver a la Ludoteca"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          {showSettingsButton && (
+            <button
+              onClick={goSettings}
+              className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
+              title="Ajustes"
+              aria-label="Abrir ajustes"
+            >
+              <SettingsIcon className="h-5 w-5" />
+            </button>
+          )}
+          <button
+            onClick={closeModule}
+            className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
+            title="Volver a la Ludoteca"
+            aria-label="Cerrar módulo de Remigio"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-[calc(2rem+env(safe-area-inset-bottom))]">
         <div className="max-w-3xl mx-auto animate-fade-in">
           {screen === 'list' && <RemigioList />}
           {screen === 'new' && <RemigioNew />}
+          {screen === 'settings' && <RemigioSettings />}
           {screen === 'session' && activeSessionId && <RemigioSession sessionId={activeSessionId} />}
         </div>
       </main>

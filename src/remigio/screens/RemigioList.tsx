@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { PlusCircle, Users, Trophy, Pause, Play, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useRemigioStore } from '../../store/useRemigioStore';
 import { statusLabel } from '../engine';
 import { RemigioSession } from '../types';
@@ -48,11 +50,13 @@ function SessionCard({ session, onOpen, onDelete }: { session: RemigioSession; o
 
 export function RemigioList() {
   const { sessions, goNew, openSession, remove } = useRemigioStore();
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const active = sessions.filter((s) => s.status !== 'finished');
   const finished = sessions.filter((s) => s.status === 'finished');
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar esta partida?')) remove(id);
+  const handleConfirmDelete = () => {
+    if (pendingDeleteId) remove(pendingDeleteId);
+    setPendingDeleteId(null);
   };
 
   return (
@@ -73,7 +77,7 @@ export function RemigioList() {
           <h2 className="text-lg font-semibold">Partidas activas</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {active.map((s) => (
-              <SessionCard key={s.id} session={s} onOpen={() => openSession(s.id)} onDelete={() => handleDelete(s.id)} />
+              <SessionCard key={s.id} session={s} onOpen={() => openSession(s.id)} onDelete={() => setPendingDeleteId(s.id)} />
             ))}
           </div>
         </div>
@@ -84,7 +88,7 @@ export function RemigioList() {
           <h2 className="text-lg font-semibold">Partidas finalizadas</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {finished.map((s) => (
-              <SessionCard key={s.id} session={s} onOpen={() => openSession(s.id)} onDelete={() => handleDelete(s.id)} />
+              <SessionCard key={s.id} session={s} onOpen={() => openSession(s.id)} onDelete={() => setPendingDeleteId(s.id)} />
             ))}
           </div>
         </div>
@@ -103,6 +107,17 @@ export function RemigioList() {
           </CardContent>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Eliminar partida"
+        description="¿Estás seguro de que quieres eliminar esta partida? Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        destructive
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

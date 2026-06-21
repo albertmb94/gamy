@@ -1,17 +1,21 @@
+import { useState } from 'react';
 import { ArrowLeft, Play, Pause, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useRemigioStore } from '../../store/useRemigioStore';
 import { statusLabel } from '../engine';
 import { Scoreboard } from '../components/Scoreboard';
 import { RoundForm } from '../components/RoundForm';
 import { RoundHistory } from '../components/RoundHistory';
+import { RoundPaymentSummary } from '../components/RoundPaymentSummary';
 import { PaymentSummary } from '../components/PaymentSummary';
 
 export function RemigioSession({ sessionId }: { sessionId: string }) {
   const { sessions, setStatus, remove, goList } = useRemigioStore();
   const session = sessions.find((s) => s.id === sessionId);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!session) {
     return (
@@ -33,8 +37,10 @@ export function RemigioSession({ sessionId }: { sessionId: string }) {
   const isPaused = session.status === 'paused' || (session.status === 'waiting' && hasRounds);
   const isFinished = session.status === 'finished';
 
-  const handleDelete = () => {
-    if (confirm('¿Cancelar y eliminar esta partida?')) remove(session.id);
+  const handleDelete = () => setConfirmDelete(true);
+  const confirmDeleteNow = () => {
+    remove(session.id);
+    setConfirmDelete(false);
   };
 
   return (
@@ -92,6 +98,8 @@ export function RemigioSession({ sessionId }: { sessionId: string }) {
 
       <Scoreboard session={session} />
 
+      {isInProgress && hasRounds && <RoundPaymentSummary session={session} />}
+
       {isInProgress && <RoundForm session={session} />}
 
       {hasRounds && <RoundHistory session={session} />}
@@ -116,6 +124,17 @@ export function RemigioSession({ sessionId }: { sessionId: string }) {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Cancelar partida"
+        description="¿Estás seguro de que quieres cancelar y eliminar esta partida? Esta acción no se puede deshacer."
+        confirmText="Sí, cancelar partida"
+        cancelText="No, volver"
+        destructive
+        onConfirm={confirmDeleteNow}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }

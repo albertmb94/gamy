@@ -1,54 +1,31 @@
 import { useState } from 'react';
-import { Plus, Minus, ArrowLeft } from 'lucide-react';
+import { Plus, Minus, ArrowLeft, Settings as SettingsIcon } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useRemigioStore } from '../../store/useRemigioStore';
-
-const SETTINGS_KEY = 'remigio-defaults';
-
-interface Defaults {
-  targetScore: number;
-  pricePerRound: number;
-  pricePerGame: number;
-  pricePerReentry: number;
-  playerNames: string[];
-}
-
-function loadDefaults(): Defaults {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...base, ...JSON.parse(raw) };
-  } catch {
-    /* ignore */
-  }
-  return base;
-}
-
-const base: Defaults = {
-  targetScore: 100,
-  pricePerRound: 0,
-  pricePerGame: 0,
-  pricePerReentry: 0,
-  playerNames: [],
-};
+import { useRemigioDefaults } from '../../store/useRemigioDefaults';
 
 export function RemigioNew() {
-  const { create, openSession, goList } = useRemigioStore();
-  const defaults = loadDefaults();
+  const { create, openSession, goList, goSettings } = useRemigioStore();
+  const defaults = useRemigioDefaults();
 
   const [name, setName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(8);
-  const [targetScore, setTargetScore] = useState(defaults.targetScore);
-  const [pricePerRound, setPricePerRound] = useState(defaults.pricePerRound);
-  const [pricePerGame, setPricePerGame] = useState(defaults.pricePerGame);
-  const [pricePerReentry, setPricePerReentry] = useState(defaults.pricePerReentry);
-  const [names, setNames] = useState<string[]>(
-    defaults.playerNames.length >= 2 ? defaults.playerNames : ['', '', ''],
-  );
+  const [targetScore, setTargetScore] = useState(defaults.defaultTargetScore);
+  const [pricePerRound, setPricePerRound] = useState(defaults.defaultPricePerRound);
+  const [pricePerGame, setPricePerGame] = useState(defaults.defaultPricePerGame);
+  const [pricePerReentry, setPricePerReentry] = useState(defaults.defaultPricePerReentry);
+  const [names, setNames] = useState<string[]>(() => {
+    const stored = defaults.defaultPlayerNames;
+    // Equivalente a Math.max(2, stored.length || 3) usado por brisca-app.
+    const count = Math.max(2, stored.length || 3);
+    return Array.from({ length: count }, (_, i) => stored[i] ?? '');
+  });
 
-  const setNameAt = (i: number, v: string) => setNames((arr) => arr.map((n, idx) => (idx === i ? v : n)));
+  const setNameAt = (i: number, v: string) =>
+    setNames((arr) => arr.map((n, idx) => (idx === i ? v : n)));
   const addPlayer = () => setNames((arr) => (arr.length < 8 ? [...arr, ''] : arr));
   const removePlayer = () => setNames((arr) => (arr.length > 2 ? arr.slice(0, -1) : arr));
 
@@ -59,14 +36,13 @@ export function RemigioNew() {
       alert('Añade al menos 2 jugadores');
       return;
     }
-    try {
-      localStorage.setItem(
-        SETTINGS_KEY,
-        JSON.stringify({ targetScore, pricePerRound, pricePerGame, pricePerReentry, playerNames: cleanNames }),
-      );
-    } catch {
-      /* ignore */
-    }
+    defaults.setDefaults({
+      defaultTargetScore: targetScore,
+      defaultPricePerRound: pricePerRound,
+      defaultPricePerGame: pricePerGame,
+      defaultPricePerReentry: pricePerReentry,
+      defaultPlayerNames: cleanNames,
+    });
     const id = create({
       name: name.trim() || 'Partida de Remigio',
       maxPlayers,
@@ -81,11 +57,17 @@ export function RemigioNew() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={goList}>
-          <ArrowLeft className="h-4 w-4" />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={goList}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-2xl font-bold tracking-tight">Nueva partida de Remigio</h1>
+        </div>
+        <Button variant="outline" size="sm" onClick={goSettings}>
+          <SettingsIcon className="h-4 w-4" />
+          Ajustes
         </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Nueva partida de Remigio</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -106,7 +88,7 @@ export function RemigioNew() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="targetScore">Puntos objetivo</Label>
-                <Input id="targetScore" type="number" min={10} value={targetScore} onChange={(e) => setTargetScore(parseInt(e.target.value) || 100)} />
+                <Input id="targetScore" type="number" min={10} value={targetScore} onChange={(e) => setTargetScore(parseInt(e.target.value) || 150)} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">

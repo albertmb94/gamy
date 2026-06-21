@@ -202,6 +202,41 @@ export function lastRound(session: RemigioSession) {
   return session.rounds.reduce((max, r) => (r.round_number > max.round_number ? r : max), session.rounds[0]);
 }
 
+export interface RemigioRoundSummaryRow {
+  player: RemigioPlayer;
+  paid: number;
+  received: number;
+  net: number;
+}
+
+export function getRoundSummary(
+  session: RemigioSession,
+  roundNumber: number,
+): RemigioRoundSummaryRow[] {
+  const round = session.rounds.find((r) => r.round_number === roundNumber);
+  if (!round) return [];
+
+  const roundTx = session.transactions.filter(
+    (t) => t.type === 'round_payment' && t.round_number === roundNumber,
+  );
+  const pricePerRound = session.price_per_round || 0;
+
+  return session.players.map((player) => {
+    const paid = roundTx
+      .filter((t) => t.game_player_id === player.id)
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    const received = roundTx
+      .filter((t) => t.recipient_id === player.id)
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    const isWinner = round.winner_id === player.id;
+    if (isWinner) {
+      const losersCount = round.scores.filter((s) => s.game_player_id !== player.id).length;
+      return { player, paid: 0, received: losersCount * pricePerRound, net: losersCount * pricePerRound };
+    }
+    return { player, paid, received, net: received - paid };
+  });
+}
+
 export function transactionLabel(t: RemigioTransaction): string {
   switch (t.type) {
     case 'round_payment':

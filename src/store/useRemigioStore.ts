@@ -12,7 +12,7 @@ import {
 import { syncItemToRemote, fetchRemoteRemigio } from '../db/turso';
 import { remigioSeed } from '../remigio/seed';
 
-export type RemigioScreen = 'list' | 'new' | 'session';
+export type RemigioScreen = 'list' | 'new' | 'session' | 'settings';
 
 interface RemigioState {
   sessions: RemigioSession[];
@@ -29,6 +29,7 @@ interface RemigioState {
   closeModule: () => void;
   goList: () => void;
   goNew: () => void;
+  goSettings: () => void;
   openSession: (id: string) => void;
 
   create: (config: NewSessionConfig) => string;
@@ -114,6 +115,7 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
     closeModule: () => set({ open: false }),
     goList: () => set({ screen: 'list', activeSessionId: null }),
     goNew: () => set({ screen: 'new' }),
+    goSettings: () => set({ screen: 'settings', activeSessionId: null }),
     openSession: (id) => set({ screen: 'session', activeSessionId: id }),
 
     create: (config) => {
