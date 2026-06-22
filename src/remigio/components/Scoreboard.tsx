@@ -18,14 +18,30 @@ export function Scoreboard({ session }: { session: RemigioSession }) {
 
   function lastRoundResult(playerId: string): { won: boolean; amount: number } | null {
     if (!last) return null;
+
+    let won = false;
+    let amount = 0;
+    const inRound = last.scores.some((s) => s.game_player_id === playerId);
+
     if (last.winner_id === playerId) {
       const losersCount = last.scores.filter((s) => s.game_player_id !== playerId).length;
-      return { won: true, amount: losersCount * pricePerRound };
+      won = true;
+      amount += losersCount * pricePerRound;
+    } else if (inRound) {
+      amount -= pricePerRound;
+    } else if (session.status !== 'finished') {
+      return null;
     }
-    if (last.scores.some((s) => s.game_player_id === playerId)) {
-      return { won: false, amount: pricePerRound };
+
+    if (session.status === 'finished') {
+      for (const tx of transactions) {
+        if (tx.type === 'round_payment') continue;
+        if (tx.recipient_id === playerId) amount += tx.amount;
+        if (tx.game_player_id === playerId) amount -= tx.amount;
+      }
     }
-    return null;
+
+    return { won, amount };
   }
 
   return (
