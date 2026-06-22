@@ -125,12 +125,12 @@ export function Scoreboard({ session }: { session: RemigioSession }) {
                     <span
                       className={cn(
                         'text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5',
-                        result.won ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600',
+                        result.amount >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600',
                       )}
                     >
-                      {result.won ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                      {result.won ? '+' : '-'}
-                      {result.amount.toFixed(2)}€
+                      {result.amount >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      {result.amount >= 0 ? '+' : '-'}
+                      {Math.abs(result.amount).toFixed(2)}€
                     </span>
                   )}
                   {transactions.length > 0 && (
