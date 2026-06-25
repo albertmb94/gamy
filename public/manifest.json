@@ -1,6 +1,6 @@
 {
-  "name": "Gamy - Ludoteca",
-  "short_name": "Gamy",
+  "name": "Ludotic - Ludoteca",
+  "short_name": "Ludotic",
   "description": "Tu ludoteca personal para gestionar juegos, jugadores, partidas y puntuaciones.",
   "start_url": "/",
   "display": "standalone",

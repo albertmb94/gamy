@@ -1,4 +1,4 @@
-# Propuestas de mejora para Gamy
+# Propuestas de mejora para Ludotic
 
 Este documento recoge ideas de mejora de UX/UI y funcionalidades detectadas durante la revisión de la aplicación.
 

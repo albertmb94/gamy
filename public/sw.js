@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gamy-v1';
+const CACHE_NAME = 'ludotic-v1';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',

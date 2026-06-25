@@ -30,7 +30,7 @@ export const useRemigioDefaults = create<RemigioDefaultsStore>()(
       resetDefaults: () => set(defaults),
     }),
     {
-      name: 'gamy-remigio-defaults',
+      name: 'ludotic-remigio-defaults',
     },
   ),
 );

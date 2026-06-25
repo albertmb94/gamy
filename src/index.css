@@ -53,7 +53,7 @@
   --ring: 0 0% 3.9%;
   --radius: 0.65rem;
 
-  /* Legacy gamy variables remapped to the light palette so existing
+  /* Legacy ludotic variables remapped to the light palette so existing
      components keep working while looking minimalist. */
   --text-primary: hsl(0 0% 3.9%);
   --text-secondary: hsl(0 0% 32%);

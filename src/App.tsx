@@ -55,7 +55,7 @@ export default function App() {
             <Gamepad2 className="h-5 w-5" />
           </div>
           <div className="leading-none">
-            <h1 className="text-base font-bold tracking-tight">Gamy</h1>
+            <h1 className="text-base font-bold tracking-tight">Ludotic</h1>
             <p className="text-[11px] text-muted-foreground mt-0.5">Tu ludoteca</p>
           </div>
         </div>

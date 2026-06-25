@@ -20,7 +20,7 @@ export function RemigioModule() {
           </div>
           <div className="leading-none">
             <p className="font-bold text-base">Remigio</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Integrado en Gamy</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Integrado en Ludotic</p>
           </div>
         </div>
         <div className="flex items-center gap-1">

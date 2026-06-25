@@ -3,14 +3,14 @@ import { DbStatus, Game, Player, MatchRecord, PlayerAchievement } from '../types
 import { RemigioSession } from '../remigio/types';
 
 /**
- * Gamy Database Connection Layer
+ * Ludotic Database Connection Layer
  *
  * La aplicación utiliza IndexedDB como almacenamiento principal (offline-first).
  * Opcionalmente, puede sincronizar directamente con Turso usando @libsql/client/web.
  *
  * Para conectar directamente con Turso desde el cliente:
- * 1. Crea la base de datos: turso db create gamy-db
- * 2. Obtén URL y token: turso db show gamy-db --url && turso db tokens create gamy-db
+ * 1. Crea la base de datos: turso db create ludotic-db
+ * 2. Obtén URL y token: turso db show ludotic-db --url && turso db tokens create ludotic-db
  * 3. Configura Vite con variables que empiecen por VITE_ para que lleguen al navegador:
  *    VITE_TURSO_DATABASE_URL=libsql://tu-db.turso.io
  *    VITE_TURSO_AUTH_TOKEN=tu-token

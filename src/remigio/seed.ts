@@ -1,4 +1,4 @@
-// Partidas históricas de brisca-app importadas a gamy.
+// Partidas históricas de brisca-app importadas a ludotic.
 // Generado automáticamente desde database-cinnabar-yacht.db.
 // Se cargan una sola vez en IndexedDB (ver useRemigioStore.load).
 import { RemigioSession } from './types';

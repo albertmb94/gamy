@@ -2,10 +2,10 @@ import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Game, Player, MatchRecord, PlayerAchievement } from '../types';
 import { RemigioSession } from '../remigio/types';
 
-const DB_NAME = 'gamy-db';
-const DB_VERSION = 3;
+const DB_NAME = 'ludotic-db';
+const DB_VERSION = 4;
 
-interface GamyDB extends DBSchema {
+interface LudoticDB extends DBSchema {
   games: {
     key: string;
     value: Game;
@@ -36,11 +36,11 @@ interface GamyDB extends DBSchema {
   };
 }
 
-let dbPromise: Promise<IDBPDatabase<GamyDB>> | null = null;
+let dbPromise: Promise<IDBPDatabase<LudoticDB>> | null = null;
 
 export function getDb() {
   if (!dbPromise) {
-    dbPromise = openDB<GamyDB>(DB_NAME, DB_VERSION, {
+    dbPromise = openDB<LudoticDB>(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           if (!db.objectStoreNames.contains('games')) db.createObjectStore('games', { keyPath: 'id' });

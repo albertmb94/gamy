@@ -1,7 +1,7 @@
-// Modelo de datos de Remigio dentro de gamy.
+// Modelo de datos de Remigio dentro de ludotic.
 //
 // Se almacena como un único documento anidado por partida (RemigioSession),
-// lo que encaja con el patrón de IndexedDB de gamy y mapea limpiamente a las
+// lo que encaja con el patrón de IndexedDB de ludotic y mapea limpiamente a las
 // tablas relacionales de brisca-app (games / game_players / rounds /
 // round_scores / transactions) cuando se migren las partidas existentes.
 

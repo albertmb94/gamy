@@ -1,6 +1,6 @@
-# Gamy
+# Ludotic
 
-Gamy es una aplicación web progresiva (PWA) para gestionar una ludoteca de juegos de mesa, registrar partidas, seguir estadísticas y aplicar logros automáticos.
+Ludotic es una aplicación web progresiva (PWA) para gestionar una ludoteca de juegos de mesa, registrar partidas, seguir estadísticas y aplicar logros automáticos.
 
 ## Funcionalidades
 
@@ -169,4 +169,4 @@ npm run build
 
 ## Licencia
 
-Proyecto interno de Gamy.
+Proyecto interno de Ludotic.
