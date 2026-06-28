@@ -1,9 +1,17 @@
 import { useState } from 'react';
-import { Crown, Pencil, Trash2, Save, X, Target, ScrollText, Spade } from 'lucide-react';
+import { Crown, Pencil, Trash2, Save, X, Target, ScrollText, Spade, Landmark } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useRemigioStore } from '../store/useRemigioStore';
 import { getBalance, statusLabel } from '../remigio/engine';
 import { cn } from '../utils/cn';
+import { Game, Player } from '../types';
+import {
+  DUEL_PAD_METADATA_ORDER,
+  DUEL_PAD_ROW_LABELS,
+  buildDuelPadCategories,
+  getDuelPadRowStyle,
+  isDuelPadCategoryKind,
+} from '../utils/duelPad';
 
 const GAME_EMOJIS: Record<string, string> = {
   'Estrategia': '♟️', 'Cartas': '🃏', 'Filler': '⚡', 'Cooperativo': '🤝',
@@ -230,59 +238,69 @@ export default function History() {
               </p>
             )}
 
-            <div className="space-y-2 mb-4">
-              {detailMatch.playerScores
-                .sort((a, b) => (b.total || 0) - (a.total || 0))
-                .map((ps, idx) => {
-                  const player = players.find(p => p.id === ps.playerId);
-                  if (!player) return null;
+            {isDuelPadMatch(detailGame) ? (
+              <DuelPadReadonly
+                game={detailGame}
+                detailMatch={detailMatch}
+                allPlayers={players}
+                editingScores={editingScores}
+                setEditingScores={setEditingScores}
+              />
+            ) : (
+              <div className="space-y-2 mb-4">
+                {detailMatch.playerScores
+                  .sort((a, b) => (b.total || 0) - (a.total || 0))
+                  .map((ps, idx) => {
+                    const player = players.find(p => p.id === ps.playerId);
+                    if (!player) return null;
 
-                  const allCats = [...detailGame.scoringTemplate.categories];
-                  detailMatch.activeExpansionIds.forEach(eid => {
-                    const exp = games.find(g => g.id === eid);
-                    if (exp) allCats.push(...exp.scoringTemplate.categories);
-                  });
+                    const allCats = [...detailGame.scoringTemplate.categories];
+                    detailMatch.activeExpansionIds.forEach(eid => {
+                      const exp = games.find(g => g.id === eid);
+                      if (exp) allCats.push(...exp.scoringTemplate.categories);
+                    });
 
-                  return (
-                    <div key={ps.playerId} className={cn('rounded-xl p-3 border', ps.playerId === detailMatch.winnerId ? 'bg-amber-50 border-amber-200' : 'bg-secondary border-border')}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}</span>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                          style={{ backgroundColor: player.color }}>
-                          {player.name.charAt(0).toUpperCase()}
+                    return (
+                      <div key={ps.playerId} className={cn('rounded-xl p-3 border', ps.playerId === detailMatch.winnerId ? 'bg-amber-50 border-amber-200' : 'bg-secondary border-border')}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}</span>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                            style={{ backgroundColor: player.color }}>
+                            {player.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-foreground font-bold text-sm flex-1">{player.name}</span>
+                          <span className="text-lg font-black text-foreground">
+                            {ps.specialVictory ? `⚡ ${ps.specialVictory}` : ps.total}
+                          </span>
                         </div>
-                        <span className="text-foreground font-bold text-sm flex-1">{player.name}</span>
-                        <span className="text-lg font-black text-foreground">
-                          {ps.specialVictory ? `⚡ ${ps.specialVictory}` : ps.total}
-                        </span>
+
+                        {detailGame.scoringTemplate.type === 'complex' && !ps.specialVictory && (
+                          <div className="grid grid-cols-3 gap-1">
+                            {allCats.map(cat => (
+                              <div key={cat.id} className="text-center">
+                                <span className="text-[10px] text-muted-foreground block truncate">{cat.name}</span>
+                                {editingScores ? (
+                                  <input type="number" inputMode="numeric"
+                                    value={editingScores[ps.playerId]?.[cat.id] ?? 0}
+                                    onChange={e => setEditingScores(prev => prev ? ({
+                                      ...prev,
+                                      [ps.playerId]: { ...(prev[ps.playerId] || {}), [cat.id]: parseInt(e.target.value) || 0 }
+                                    }) : null)}
+                                    className="w-full input-field text-center px-1 py-1 text-xs" />
+                                ) : (
+                                  <span className="text-xs text-foreground font-bold">{ps.scores[cat.id] || 0}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
+                    );
+                  })}
+              </div>
+            )}
 
-                      {detailGame.scoringTemplate.type === 'complex' && !ps.specialVictory && (
-                        <div className="grid grid-cols-3 gap-1">
-                          {allCats.map(cat => (
-                            <div key={cat.id} className="text-center">
-                              <span className="text-[10px] text-muted-foreground block truncate">{cat.name}</span>
-                              {editingScores ? (
-                                <input type="number" inputMode="numeric"
-                                  value={editingScores[ps.playerId]?.[cat.id] ?? 0}
-                                  onChange={e => setEditingScores(prev => prev ? ({
-                                    ...prev,
-                                    [ps.playerId]: { ...(prev[ps.playerId] || {}), [cat.id]: parseInt(e.target.value) || 0 }
-                                  }) : null)}
-                                  className="w-full input-field text-center px-1 py-1 text-xs" />
-                              ) : (
-                                <span className="text-xs text-foreground font-bold">{ps.scores[cat.id] || 0}</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
-
-            <div className="flex gap-2">
+            <div className="flex gap-2 mt-4">
               {editingScores ? (
                 <>
                   <button onClick={() => setEditingScores(null)} className="btn btn-secondary flex-1 py-3">Cancelar</button>
@@ -303,6 +321,188 @@ export default function History() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Detecta si un match debe mostrarse con el scorepad Duel. */
+function isDuelPadMatch(game: Game): boolean {
+  if (game.scoringTemplate.layout === 'duel-pad') return true;
+  if (/7\s*wonders\s*duel/i.test(game.name)) return true;
+  return false;
+}
+
+/** Scorepad estilo 7 Wonders Duel en modo lectura (también editable). */
+function DuelPadReadonly({
+  game,
+  detailMatch,
+  allPlayers,
+  editingScores,
+  setEditingScores,
+}: {
+  game: Game;
+  detailMatch: { playerScores: Array<{ playerId: string; scores: Record<string, number>; total: number; specialVictory?: string }>; activeExpansionIds: string[] };
+  allPlayers: Player[];
+  editingScores: Record<string, Record<string, number>> | null;
+  setEditingScores: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>> | null>>;
+}) {
+  const defaults = buildDuelPadCategories();
+  const orderedCats = (() => {
+    const out: { id: string; name: string; metadata?: any }[] = [];
+    const seen = new Set<string>();
+    DUEL_PAD_METADATA_ORDER.forEach(meta => {
+      const found = game.scoringTemplate.categories.find(c => c.metadata === meta);
+      const def = defaults.find(d => d.metadata === meta);
+      const cat = found || def;
+      if (cat && !seen.has(cat.id)) {
+        seen.add(cat.id);
+        out.push(cat);
+      }
+    });
+    game.scoringTemplate.categories.forEach(c => {
+      if (!seen.has(c.id)) {
+        seen.add(c.id);
+        out.push(c);
+      }
+    });
+    return out;
+  })();
+
+  const matchPlayers = detailMatch.playerScores
+    .map(ps => ({ ...ps, player: allPlayers.find(p => p.id === ps.playerId)! }))
+    .filter(ps => ps.player)
+    .sort((a, b) => b.total - a.total);
+
+  const headerStyle = getDuelPadRowStyle('wonder_header');
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-black/20 mb-4">
+      <div
+        className="grid items-stretch border-b-2 border-black/40"
+        style={{
+          backgroundColor: headerStyle.bg,
+          color: '#FFFFFF',
+          gridTemplateColumns: `minmax(0, 1.6fr) repeat(${matchPlayers.length}, minmax(0, 1fr))`,
+        }}
+      >
+        <div className="flex items-center justify-center py-3 px-2">
+          <Landmark className="h-5 w-5 mr-1" />
+          <span className="text-xs font-bold uppercase tracking-wider">{game.name}</span>
+        </div>
+        {matchPlayers.map(ps => (
+          <div key={ps.player.id} className="flex flex-col items-center justify-center py-3 px-1 border-l border-white/20">
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold mb-1"
+              style={{ backgroundColor: ps.player.color }}>
+              {ps.player.name.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-[11px] font-bold truncate max-w-full">
+              {ps.player.id === detailMatch.playerScores.find(p => p.total === Math.max(...detailMatch.playerScores.map(x => x.total)))?.playerId ? '🏆 ' : ''}
+              {ps.player.name}
+            </span>
+          </div>
+        ))}
+      </div>
+      {orderedCats.map(cat => {
+        const meta = cat.metadata;
+        if (!meta || !isDuelPadCategoryKind(meta)) {
+          return (
+            <div
+              key={cat.id}
+              className="grid items-stretch border-b border-black/10 last:border-b-0"
+              style={{ gridTemplateColumns: `minmax(0, 1.6fr) repeat(${matchPlayers.length}, minmax(0, 1fr))` }}
+            >
+              <div className="flex items-center gap-2 py-2 px-3 bg-secondary text-foreground">
+                <span className="text-[10px] font-bold uppercase tracking-wider truncate">{cat.name}</span>
+              </div>
+              {matchPlayers.map(ps => (
+                <div key={ps.player.id} className="border-l border-black/10 flex items-center justify-center py-2 px-1">
+                  {editingScores ? (
+                    <input type="number" inputMode="numeric"
+                      value={editingScores[ps.player.id]?.[cat.id] ?? 0}
+                      onChange={e => setEditingScores(prev => prev ? ({
+                        ...prev,
+                        [ps.player.id]: { ...(prev[ps.player.id] || {}), [cat.id]: parseInt(e.target.value) || 0 }
+                      }) : null)}
+                      className="w-full input-field text-center px-1 py-1 text-xs" />
+                  ) : (
+                    <span className="text-sm font-bold text-foreground tabular-nums">{ps.scores[cat.id] || 0}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        const style = getDuelPadRowStyle(meta);
+        const isDark = meta === 'wonder_total' || meta === 'wonder_supremacia_militar' || meta === 'wonder_supremacia_cientifica' || meta === 'wonder_supremacia_civil';
+        const isTotal = meta === 'wonder_total';
+
+        return (
+          <div
+            key={cat.id}
+            className="grid items-stretch border-b border-black/10 last:border-b-0"
+            style={{ gridTemplateColumns: `minmax(0, 1.6fr) repeat(${matchPlayers.length}, minmax(0, 1fr))` }}
+          >
+            <div
+              className="flex items-center gap-2 py-2 px-3"
+              style={{ backgroundColor: style.bg, color: isDark ? '#FFFFFF' : '#0F172A' }}
+            >
+              <span
+                className="inline-flex items-center justify-center shrink-0 rounded"
+                style={{ backgroundColor: style.iconBg, width: 28, height: 28 }}
+              >
+                {style.icon}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                {DUEL_PAD_ROW_LABELS[meta] || cat.name}
+              </span>
+            </div>
+            {matchPlayers.map(ps => {
+              if (isTotal) {
+                return (
+                  <div
+                    key={ps.player.id}
+                    className="border-l border-white/20 flex items-center justify-center py-2 px-1 tabular-nums font-black text-base"
+                    style={{ backgroundColor: style.bg, color: '#FFFFFF' }}
+                  >
+                    {ps.total}
+                  </div>
+                );
+              }
+              const val = ps.scores[cat.id] || 0;
+              return (
+                <div
+                  key={ps.player.id}
+                  className="border-l border-black/10 flex items-center justify-center py-1.5 px-1"
+                  style={{ backgroundColor: style.bg }}
+                >
+                  {editingScores ? (
+                    <input type="number" inputMode="numeric"
+                      value={editingScores[ps.player.id]?.[cat.id] ?? 0}
+                      onChange={e => setEditingScores(prev => prev ? ({
+                        ...prev,
+                        [ps.player.id]: { ...(prev[ps.player.id] || {}), [cat.id]: parseInt(e.target.value) || 0 }
+                      }) : null)}
+                      className={cn(
+                        'w-full text-center px-1 py-1 text-xs tabular-nums rounded bg-transparent border border-black/15',
+                        isDark && 'text-white border-white/30'
+                      )}
+                      style={{ color: isDark ? '#FFFFFF' : '#0F172A' }}
+                    />
+                  ) : (
+                    <span
+                      className={cn('text-sm font-bold tabular-nums', isDark ? 'text-white' : 'text-foreground')}
+                      style={{ color: isDark ? '#FFFFFF' : '#0F172A' }}
+                    >
+                      {val}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 }

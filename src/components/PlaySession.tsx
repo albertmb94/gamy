@@ -1,9 +1,16 @@
 import { useState, useMemo } from 'react';
-import { Search, X, Dices, Check, Crown, Package, Target, Rocket } from 'lucide-react';
+import { Search, X, Dices, Check, Crown, Package, Target, Rocket, Landmark } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { PlayerScore, ScoreCategory } from '../types';
+import { Game, Player, PlayerScore, ScoreCategory } from '../types';
 import { cn } from '../utils/cn';
 import { GameCover } from './GameCover';
+import {
+  DUEL_PAD_METADATA_ORDER,
+  DUEL_PAD_ROW_LABELS,
+  buildDuelPadCategories,
+  getDuelPadRowStyle,
+  isDuelPadCategoryKind,
+} from '../utils/duelPad';
 
 type PlayStep = 'selectGame' | 'selectPlayers' | 'configure' | 'scoring';
 
@@ -28,6 +35,180 @@ function StepHeader({ title, subtitle, onBack }: { title: string; subtitle?: str
         <h2 className="text-2xl font-bold tracking-tight text-foreground">{title}</h2>
         {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
       </div>
+    </div>
+  );
+}
+
+/** Scorepad estilo 7 Wonders Duel: una fila por categoría con su icono
+ *  específico, una columna por jugador, total integrado al final. */
+function DuelPadScorepad({
+  game,
+  selectedPlayers,
+  playerScores,
+  onScoreChange,
+}: {
+  game: Game;
+  selectedPlayers: Player[];
+  playerScores: Record<string, Record<string, number>>;
+  onScoreChange: (playerId: string, catId: string, value: number) => void;
+}) {
+  // Ordenamos las categorías del juego según el orden canónico del scorepad.
+  // Si el juego no tiene todas, las que falten se rellenan con los valores
+  // por defecto del scorepad (buildDuelPadCategories) para no romper la UI.
+  const defaults = useMemo(() => buildDuelPadCategories(), []);
+  const catsById = useMemo(() => {
+    const m = new Map<string, ScoreCategory>();
+    game.scoringTemplate.categories.forEach(c => m.set(c.id, c));
+    return m;
+  }, [game]);
+
+  const orderedCats: ScoreCategory[] = useMemo(() => {
+    const out: ScoreCategory[] = [];
+    const seen = new Set<string>();
+    DUEL_PAD_METADATA_ORDER.forEach(meta => {
+      const found = game.scoringTemplate.categories.find(c => c.metadata === meta);
+      const def = defaults.find(d => d.metadata === meta);
+      const cat = found || def;
+      if (cat && !seen.has(cat.id)) {
+        seen.add(cat.id);
+        out.push(cat);
+      }
+    });
+    // Añadimos cualquier categoría extra del juego (p.ej. expansiones) al final.
+    game.scoringTemplate.categories.forEach(c => {
+      if (!seen.has(c.id)) {
+        seen.add(c.id);
+        out.push(c);
+      }
+    });
+    return out;
+  }, [game, defaults, catsById]);
+
+  const headerStyle = getDuelPadRowStyle('wonder_header');
+
+  return (
+    <div className="glass-card overflow-hidden">
+      {/* Fila de cabecera con los nombres de los jugadores */}
+      <div
+        className="grid items-stretch border-b-2 border-black/40"
+        style={{
+          backgroundColor: headerStyle.bg,
+          color: '#FFFFFF',
+          gridTemplateColumns: `minmax(0, 1.6fr) repeat(${selectedPlayers.length}, minmax(0, 1fr))`,
+        }}
+      >
+        <div className="flex items-center justify-center py-3 px-2">
+          <Landmark className="h-5 w-5 mr-1" />
+          <span className="text-xs font-bold uppercase tracking-wider">
+            {game.name}
+          </span>
+        </div>
+        {selectedPlayers.map(p => (
+          <div key={p.id} className="flex flex-col items-center justify-center py-3 px-1 border-l border-white/20">
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold mb-1"
+              style={{ backgroundColor: p.color }}>
+              {p.name.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-[11px] font-bold truncate max-w-full">{p.name}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Filas de categorías */}
+      {orderedCats.map(cat => {
+        const meta = cat.metadata;
+        if (!meta || !isDuelPadCategoryKind(meta)) {
+          // Categoría personalizada: render genérico pero conservando el row layout
+          return (
+            <div
+              key={cat.id}
+              className="grid items-stretch border-b border-black/10 last:border-b-0"
+              style={{ gridTemplateColumns: `minmax(0, 1.6fr) repeat(${selectedPlayers.length}, minmax(0, 1fr))` }}
+            >
+              <div className="flex items-center gap-2 py-2 px-3 bg-secondary text-foreground">
+                <span className="text-[10px] font-bold uppercase tracking-wider truncate">{cat.name}</span>
+              </div>
+              {selectedPlayers.map(p => (
+                <div key={p.id} className="border-l border-black/10 flex items-center justify-center py-2 px-1">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={playerScores[p.id]?.[cat.id] ?? ''}
+                    onChange={e => onScoreChange(p.id, cat.id, parseInt(e.target.value) || 0)}
+                    className="input-field text-center text-sm py-1.5 w-full"
+                  />
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        const style = getDuelPadRowStyle(meta);
+        const isDark = meta === 'wonder_total' || meta === 'wonder_supremacia_militar' || meta === 'wonder_supremacia_cientifica' || meta === 'wonder_supremacia_civil';
+        const isTotal = meta === 'wonder_total';
+
+        return (
+          <div
+            key={cat.id}
+            className="grid items-stretch border-b border-black/10 last:border-b-0"
+            style={{ gridTemplateColumns: `minmax(0, 1.6fr) repeat(${selectedPlayers.length}, minmax(0, 1fr))` }}
+          >
+            <div
+              className="flex items-center gap-2 py-2 px-3"
+              style={{ backgroundColor: style.bg, color: isDark ? '#FFFFFF' : '#0F172A' }}
+            >
+              <span
+                className="inline-flex items-center justify-center shrink-0 rounded"
+                style={{ backgroundColor: style.iconBg, width: 28, height: 28 }}
+              >
+                {style.icon}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                {DUEL_PAD_ROW_LABELS[meta] || cat.name}
+              </span>
+            </div>
+            {selectedPlayers.map(p => {
+              if (isTotal) {
+                const total = orderedCats.reduce((acc, c) => {
+                  if (c.id === cat.id) return acc;
+                  if (c.metadata === 'wonder_total') return acc;
+                  return acc + (playerScores[p.id]?.[c.id] || 0);
+                }, 0);
+                return (
+                  <div
+                    key={p.id}
+                    className="border-l border-white/20 flex items-center justify-center py-2 px-1 tabular-nums font-black text-base"
+                    style={{ backgroundColor: style.bg, color: '#FFFFFF' }}
+                  >
+                    {total}
+                  </div>
+                );
+              }
+              const val = playerScores[p.id]?.[cat.id];
+              return (
+                <div
+                  key={p.id}
+                  className="border-l border-black/10 flex items-center justify-center py-1.5 px-1"
+                  style={{ backgroundColor: isDark ? style.bg : style.bg }}
+                >
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={val ?? ''}
+                    onChange={e => onScoreChange(p.id, cat.id, parseInt(e.target.value) || 0)}
+                    className={cn(
+                      'text-center text-sm py-1.5 w-full bg-transparent border border-black/15 rounded tabular-nums',
+                      'focus:outline-none focus:ring-1 focus:ring-black/30 focus:bg-white/40',
+                      isDark && 'text-white placeholder-white/60 border-white/30 focus:bg-white/10'
+                    )}
+                    style={{ color: isDark ? '#FFFFFF' : '#0F172A' }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -119,7 +300,11 @@ export default function PlaySession() {
 
   const getPlayerTotal = (playerId: string): number => {
     const scores = playerScores[playerId] || {};
-    return allCategories.reduce((sum, cat) => sum + (scores[cat.id] || 0), 0);
+    return allCategories.reduce((sum, cat) => {
+      // El 'wonder_total' es una fila calculada, no se suma a sí misma.
+      if (cat.metadata === 'wonder_total') return sum;
+      return sum + (scores[cat.id] || 0);
+    }, 0);
   };
 
   const hasAnySpecialVictory = Object.keys(specialVictories).length > 0;
@@ -367,6 +552,10 @@ export default function PlaySession() {
   if (step === 'scoring') {
     const selectedPlayers = players.filter(p => selectedPlayerIds.includes(p.id));
     const isSimple = selectedGame?.scoringTemplate.type === 'simple' && activeExpansionIds.length === 0;
+    const useDuelPad =
+      !!selectedGame &&
+      (selectedGame.scoringTemplate.layout === 'duel-pad' ||
+        /7\s*wonders\s*duel/i.test(selectedGame.name));
 
     return (
       <div className="space-y-4">
@@ -408,7 +597,16 @@ export default function PlaySession() {
           </div>
         )}
 
-        {!hasAnySpecialVictory && (
+        {!hasAnySpecialVictory && useDuelPad && selectedGame && (
+          <DuelPadScorepad
+            game={selectedGame}
+            selectedPlayers={selectedPlayers}
+            playerScores={playerScores}
+            onScoreChange={updateScore}
+          />
+        )}
+
+        {!hasAnySpecialVictory && !useDuelPad && (
           <div className="space-y-3">
             {selectedPlayers.map(player => (
               <div key={player.id} className="glass-card p-4">

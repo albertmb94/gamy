@@ -228,3 +228,27 @@ export async function importRemigioSeedOnce(seed: RemigioSession[]): Promise<voi
   await tx.objectStore('meta').put(true, 'remigioImported');
   await tx.done;
 }
+
+/**
+ * Importa una sola vez los juegos predefinidos (p. ej. 7 Wonders Duel) en
+ * IndexedDB. Idempotente: no sobrescribe juegos existentes por nombre, de
+ * forma que si el usuario ya tenía un 7 Wonders Duel creado (por ejemplo
+ * desde la plantilla), no se duplica ni se le pisa su configuración.
+ */
+export async function importGamesSeedOnce(seed: Game[]): Promise<void> {
+  const db = await getDb();
+  const alreadyImported = await db.get('meta', 'gamesImported');
+  if (alreadyImported === true) return;
+
+  const tx = db.transaction(['games', 'meta'], 'readwrite');
+  const store = tx.objectStore('games');
+  for (const game of seed) {
+    // Solo insertamos si NO existe ya un juego con el mismo nombre (case-insensitive).
+    const all = await store.getAll();
+    const lower = game.name.trim().toLowerCase();
+    const exists = all.some((g: Game) => g.name.trim().toLowerCase() === lower);
+    if (!exists) await store.put(game);
+  }
+  await tx.objectStore('meta').put(true, 'gamesImported');
+  await tx.done;
+}

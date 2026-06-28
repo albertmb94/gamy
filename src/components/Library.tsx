@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Search, Plus, SlidersHorizontal, Heart, X, Pencil, Trash2, Package, Spade, ChevronRight } from 'lucide-react';
+import { Search, Plus, SlidersHorizontal, Heart, X, Pencil, Trash2, Package, Spade, ChevronRight, Swords } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useRemigioStore } from '../store/useRemigioStore';
 import { Game, GameType, ScoringTemplate, ScoreCategory } from '../types';
 import { v4 as uuid } from 'uuid';
 import { cn } from '../utils/cn';
 import { GameCover } from './GameCover';
+import { buildDuelPadCategories } from '../utils/duelPad';
 
 const ALL_TYPES: GameType[] = ['Estrategia', 'Cartas', 'Filler', 'Cooperativo', 'Dados', 'Puzzle', 'Construcción', 'Negociación', 'Destreza', 'Familiar', 'Abstracto', 'Duel'];
 
@@ -110,11 +111,29 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
     setCategories(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const applyDuelPadPreset = () => {
+    if (!name.trim()) setName('7 Wonders Duel');
+    if (!imageUrl.trim()) setImageUrl('/images/7wonders-duel.jpg');
+    if (!types.includes('Duel')) setTypes(prev => [...prev, 'Duel']);
+    if (!types.includes('Cartas')) setTypes(prev => [...prev, 'Cartas']);
+    setScoringType('complex');
+    setCategories(buildDuelPadCategories());
+    setAllowSpecialVictory(true);
+    if (specialVictoryTypes.length === 0) {
+      setSpecialVictoryTypes(['Supremacía Militar', 'Supremacía Científica', 'Supremacía Civil']);
+    }
+    setDifficulty(3);
+    setDuration(30);
+  };
+
   const handleSave = () => {
     if (!name.trim()) return;
+    const isDuelPad =
+      name.toLowerCase().includes('7 wonders') ||
+      categories.some(c => c.metadata?.startsWith('wonder_'));
     const template: ScoringTemplate = scoringType === 'simple'
       ? { type: 'simple', categories: [{ id: 'total', name: 'Total' }] }
-      : { type: 'complex', categories };
+      : { type: 'complex', categories, ...(isDuelPad ? { layout: 'duel-pad' as const } : {}) };
 
     const payload = {
       name: name.trim(),
@@ -215,6 +234,11 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
                   Compleja
                 </button>
               </div>
+
+              <button type="button" onClick={applyDuelPadPreset}
+                className="w-full btn btn-secondary py-2.5 text-sm border-dashed">
+                <Swords className="h-4 w-4" /> Usar plantilla 7 Wonders Duel
+              </button>
             </div>
           </Section>
 
@@ -237,6 +261,18 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
                       <option value="moneda">Moneda</option>
                       <option value="progreso">Progreso</option>
                       <option value="politica">Política</option>
+                      <option value="wonder_civil">7WD · Azul</option>
+                      <option value="wonder_comercio">7WD · Verde</option>
+                      <option value="wonder_recurso">7WD · Amarilla</option>
+                      <option value="wonder_gremio">7WD · Morada</option>
+                      <option value="maravilla">7WD · Etapa</option>
+                      <option value="wonder_moneda">7WD · Moneda V</option>
+                      <option value="wonder_derrota">7WD · Derrota</option>
+                      <option value="wonder_progreso">7WD · Progreso</option>
+                      <option value="wonder_supremacia_militar">7WD · Supremacía M.</option>
+                      <option value="wonder_supremacia_cientifica">7WD · Supremacía C.</option>
+                      <option value="wonder_supremacia_civil">7WD · Supremacía V.</option>
+                      <option value="wonder_total">7WD · Total</option>
                     </select>
                     <button onClick={() => removeCategory(idx)} className="btn btn-danger px-2.5 py-2"><X className="h-4 w-4" /></button>
                   </div>

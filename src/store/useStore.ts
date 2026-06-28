@@ -12,8 +12,10 @@ import {
   deleteMatch as deleteMatchDb,
   getSyncQueue,
   clearSyncItem,
+  importGamesSeedOnce,
 } from '../db/localDb';
 import { syncItemToRemote, checkRemoteConnection, fetchRemoteState } from '../db/turso';
+import { gamesSeed } from '../utils/gamesSeed';
 
 interface AppState {
   // Data
@@ -323,7 +325,7 @@ export const useStore = create<AppState>()((set, get) => ({
       }
 
       if (isWinner && game && (game.name.includes('7 Wonders'))) {
-        const militaryCat = game.scoringTemplate.categories.find(c => c.metadata === 'militar');
+        const militaryCat = game.scoringTemplate.categories.find(c => c.metadata === 'militar' || c.metadata === 'wonder_derrota');
         if (militaryCat && playerScore) {
           const milScore = playerScore.scores[militaryCat.id] || 0;
           if (milScore === 0) {
@@ -344,6 +346,12 @@ export const useStore = create<AppState>()((set, get) => ({
     // Al cargar, deduplicamos por nombre para limpiar registros duplicados
     // de runs anteriores (la BD local puede contener varios juegos con el
     // mismo name y distinto id debido a errores previos).
+
+    // Importar juegos predefinidos (7 Wonders Duel y futuros) una sola vez.
+    // Idempotente: si el usuario ya tenía un 7 Wonders Duel creado
+    // manualmente, no se duplica ni se sobreescribe.
+    await importGamesSeedOnce(gamesSeed).catch((e) => console.error('Error importing games seed:', e));
+
     const loaded = await loadLocalState();
     const originalQueue = await getSyncQueue();
     const queuedIds = new Set(originalQueue.map(q => q.id));
