@@ -6,6 +6,7 @@ import { getBalance, statusLabel } from '../remigio/engine';
 import { cn } from '../utils/cn';
 import { Game, Player } from '../types';
 import {
+  DUEL_PAD_EXCLUDED_METADATA,
   DUEL_PAD_METADATA_ORDER,
   DUEL_PAD_ROW_LABELS,
   buildDuelPadCategories,
@@ -392,17 +393,19 @@ function DuelPadReadonly({
   const orderedCats = (() => {
     const out: { id: string; name: string; metadata?: any }[] = [];
     const seen = new Set<string>();
+    const isExcluded = (c: { metadata?: string }) =>
+      !!c.metadata && DUEL_PAD_EXCLUDED_METADATA.has(c.metadata as any);
     DUEL_PAD_METADATA_ORDER.forEach(meta => {
       const found = game.scoringTemplate.categories.find(c => c.metadata === meta);
       const def = defaults.find(d => d.metadata === meta);
       const cat = found || def;
-      if (cat && !seen.has(cat.id)) {
+      if (cat && !seen.has(cat.id) && !isExcluded(cat)) {
         seen.add(cat.id);
         out.push(cat);
       }
     });
     game.scoringTemplate.categories.forEach(c => {
-      if (!seen.has(c.id)) {
+      if (!seen.has(c.id) && !isExcluded(c)) {
         seen.add(c.id);
         out.push(c);
       }

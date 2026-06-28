@@ -5,6 +5,7 @@ import { Game, Player, PlayerScore, ScoreCategory } from '../types';
 import { cn } from '../utils/cn';
 import { GameCover } from './GameCover';
 import {
+  DUEL_PAD_EXCLUDED_METADATA,
   DUEL_PAD_METADATA_ORDER,
   DUEL_PAD_ROW_LABELS,
   SUPREMACY_OPTIONS,
@@ -66,18 +67,21 @@ function DuelPadScorepad({
   const orderedCats: ScoreCategory[] = useMemo(() => {
     const out: ScoreCategory[] = [];
     const seen = new Set<string>();
+    const isExcluded = (c: ScoreCategory) =>
+      !!c.metadata && DUEL_PAD_EXCLUDED_METADATA.has(c.metadata);
     DUEL_PAD_METADATA_ORDER.forEach(meta => {
       const found = game.scoringTemplate.categories.find(c => c.metadata === meta);
       const def = defaults.find(d => d.metadata === meta);
       const cat = found || def;
-      if (cat && !seen.has(cat.id)) {
+      if (cat && !seen.has(cat.id) && !isExcluded(cat)) {
         seen.add(cat.id);
         out.push(cat);
       }
     });
-    // Añadimos cualquier categoría extra del juego (p.ej. expansiones) al final.
+    // Añadimos cualquier categoría extra del juego (p.ej. expansiones) al final,
+    // exceptuando las que estén explícitamente excluidas (Derrota, supremacías).
     game.scoringTemplate.categories.forEach(c => {
-      if (!seen.has(c.id)) {
+      if (!seen.has(c.id) && !isExcluded(c)) {
         seen.add(c.id);
         out.push(c);
       }

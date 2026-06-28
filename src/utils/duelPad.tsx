@@ -293,7 +293,9 @@ export const SUPREMACY_TYPES = [
 export type SupremacyType = typeof SUPREMACY_TYPES[number];
 
 /** Categorías del scorepad Duel en el orden visual de la imagen. Las
- *  supremacías no entran aquí: son la condición de victoria, no una fila. */
+ *  supremacías no entran aquí: son la condición de victoria, no una fila.
+ *  La derrota queda excluida porque ya no se puntúa (se decide por
+ *  supremacía / ganador en la sección inferior). */
 export const DUEL_PAD_METADATA_ORDER: ScoreCategoryMetadata[] = [
   'wonder_civil',
   'wonder_comercio',
@@ -306,6 +308,15 @@ export const DUEL_PAD_METADATA_ORDER: ScoreCategoryMetadata[] = [
   'wonder_progreso',
   'wonder_total',
 ];
+
+/** Metadatos que NUNCA deben renderizarse como fila del scorepad Duel. */
+export const DUEL_PAD_EXCLUDED_METADATA: ReadonlySet<ScoreCategoryMetadata> = new Set([
+  'wonder_derrota',
+  'wonder_supremacia_militar',
+  'wonder_supremacia_cientifica',
+  'wonder_supremacia_civil',
+  'militar', // legacy: usado en achievements pero no en filas
+]);
 
 /** Etiquetas mostradas en las supremacy cards de la sección inferior. */
 export const SUPREMACY_OPTIONS: { type: string; label: string; meta: ScoreCategoryMetadata }[] = [

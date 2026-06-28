@@ -13,6 +13,7 @@ import {
   getSyncQueue,
   clearSyncItem,
   importGamesSeedOnce,
+  migrateDuelPadObsoleteCategories,
 } from '../db/localDb';
 import { syncItemToRemote, checkRemoteConnection, fetchRemoteState } from '../db/turso';
 import { gamesSeed } from '../utils/gamesSeed';
@@ -351,6 +352,11 @@ export const useStore = create<AppState>()((set, get) => ({
     // Idempotente: si el usuario ya tenía un 7 Wonders Duel creado
     // manualmente, no se duplica ni se sobreescribe.
     await importGamesSeedOnce(gamesSeed).catch((e) => console.error('Error importing games seed:', e));
+
+    // Migración: limpia categorías obsoletas (Derrota, supremacías) del
+    // scorepad de 7 Wonders Duel en registros ya guardados localmente.
+    // Idempotente: marcada con una bandera en meta, solo corre una vez.
+    await migrateDuelPadObsoleteCategories().catch((e) => console.error('Error migrating duel-pad categories:', e));
 
     const loaded = await loadLocalState();
     const originalQueue = await getSyncQueue();

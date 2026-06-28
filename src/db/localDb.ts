@@ -252,3 +252,47 @@ export async function importGamesSeedOnce(seed: Game[]): Promise<void> {
   await tx.objectStore('meta').put(true, 'gamesImported');
   await tx.done;
 }
+
+/** Metadatos que ya no deben existir como filas del scorepad Duel. */
+const OBSOLETE_DUEL_PAD_METADATA = new Set([
+  'wonder_derrota',
+  'wonder_supremacia_militar',
+  'wonder_supremacia_cientifica',
+  'wonder_supremacia_civil',
+]);
+
+/**
+ * Limpia categorías obsoletas del scorepad de 7 Wonders Duel en registros
+ * ya guardados localmente. Se ejecuta en cada carga porque es idempotente:
+ * si no hay nada que limpiar, no toca nada. Marca la migración como
+ * aplicada para no recorrer todas las partidas en cada inicio.
+ */
+export async function migrateDuelPadObsoleteCategories(): Promise<void> {
+  const db = await getDb();
+  const done = await db.get('meta', 'duelPadMigratedV1');
+  if (done === true) return;
+
+  const tx = db.transaction(['games', 'meta'], 'readwrite');
+  const store = tx.objectStore('games');
+  const all = (await store.getAll()) as Game[];
+  let changed = false;
+  for (const g of all) {
+    const isDuel =
+      g.scoringTemplate.layout === 'duel-pad' ||
+      /7\s*wonders\s*duel/i.test(g.name);
+    if (!isDuel) continue;
+    const filtered = g.scoringTemplate.categories.filter(c => {
+      const meta = c.metadata as string | undefined;
+      return !meta || !OBSOLETE_DUEL_PAD_METADATA.has(meta);
+    });
+    if (filtered.length !== g.scoringTemplate.categories.length) {
+      await store.put({ ...g, scoringTemplate: { ...g.scoringTemplate, categories: filtered } });
+      changed = true;
+    }
+  }
+  await tx.objectStore('meta').put(true, 'duelPadMigratedV1');
+  await tx.done;
+  if (changed) {
+    console.log('[migrateDuelPadObsoleteCategories] limpieza aplicada');
+  }
+}
