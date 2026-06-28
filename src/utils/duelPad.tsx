@@ -225,16 +225,16 @@ export const DUEL_PAD_ROW_ORDER: DuelPadRowKind[] = [
   'moneda',
   'wonder_progreso',
   'wonder_total',
-  'wonder_supremacia_militar',
-  'wonder_supremacia_cientifica',
-  'wonder_supremacia_civil',
 ];
 
 export function getDuelPadRowStyle(kind: DuelPadRowKind): DuelPadRowStyle {
   return DUEL_PAD_ROW_STYLES[kind];
 }
 
-/** Categorías por defecto para el scorepad de 7 Wonders Duel. */
+/** Categorías por defecto para el scorepad de 7 Wonders Duel.
+ *  NOTA: las supremacías NO son filas del scorepad — son la condición de
+ *  victoria que se marca en el bloque inferior (DuelSupremacyPicker). El
+ *  estilo/ícono de cada supremacía se reutiliza desde DUEL_PAD_ROW_STYLES. */
 export function buildDuelPadCategories(): ScoreCategory[] {
   return [
     { id: 'civil', name: 'Azules', metadata: 'wonder_civil' },
@@ -247,9 +247,6 @@ export function buildDuelPadCategories(): ScoreCategory[] {
     { id: 'moneda_a', name: 'Monedas A', metadata: 'moneda' },
     { id: 'progreso', name: 'Progreso', metadata: 'wonder_progreso' },
     { id: 'total', name: 'Total', metadata: 'wonder_total' },
-    { id: 'sup_mil', name: 'Supremacía M.', metadata: 'wonder_supremacia_militar' },
-    { id: 'sup_cie', name: 'Supremacía C.', metadata: 'wonder_supremacia_cientifica' },
-    { id: 'sup_civ', name: 'Supremacía V.', metadata: 'wonder_supremacia_civil' },
   ];
 }
 
@@ -295,7 +292,8 @@ export const SUPREMACY_TYPES = [
 ] as const;
 export type SupremacyType = typeof SUPREMACY_TYPES[number];
 
-/** Categorías del scorepad Duel en el orden visual de la imagen. */
+/** Categorías del scorepad Duel en el orden visual de la imagen. Las
+ *  supremacías no entran aquí: son la condición de victoria, no una fila. */
 export const DUEL_PAD_METADATA_ORDER: ScoreCategoryMetadata[] = [
   'wonder_civil',
   'wonder_comercio',
@@ -307,9 +305,6 @@ export const DUEL_PAD_METADATA_ORDER: ScoreCategoryMetadata[] = [
   'moneda',
   'wonder_progreso',
   'wonder_total',
-  'wonder_supremacia_militar',
-  'wonder_supremacia_cientifica',
-  'wonder_supremacia_civil',
 ];
 
 /** Etiquetas mostradas en las supremacy cards de la sección inferior. */
