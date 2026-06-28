@@ -11,6 +11,7 @@ import {
   buildDuelPadCategories,
   getDuelPadRowStyle,
   isDuelPadCategoryKind,
+  supremacyMetaFor,
 } from '../utils/duelPad';
 
 const GAME_EMOJIS: Record<string, string> = {
@@ -239,13 +240,16 @@ export default function History() {
             )}
 
             {isDuelPadMatch(detailGame) ? (
-              <DuelPadReadonly
-                game={detailGame}
-                detailMatch={detailMatch}
-                allPlayers={players}
-                editingScores={editingScores}
-                setEditingScores={setEditingScores}
-              />
+              <>
+                <DuelPadReadonly
+                  game={detailGame}
+                  detailMatch={detailMatch}
+                  allPlayers={players}
+                  editingScores={editingScores}
+                  setEditingScores={setEditingScores}
+                />
+                <DuelSupremacySummary match={detailMatch} allPlayers={players} />
+              </>
             ) : (
               <div className="space-y-2 mb-4">
                 {detailMatch.playerScores
@@ -321,6 +325,44 @@ export default function History() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Bloque compacto con la supremacía que decidió la partida (modo Duel Pad). */
+function DuelSupremacySummary({
+  match,
+  allPlayers,
+}: {
+  match: { playerScores: Array<{ playerId: string; specialVictory?: string }> };
+  allPlayers: Player[];
+}) {
+  const winnerEntry = match.playerScores.find(ps => ps.specialVictory);
+  if (!winnerEntry) return null;
+  const supMeta = supremacyMetaFor(winnerEntry.specialVictory || '');
+  const style = supMeta ? getDuelPadRowStyle(supMeta) : null;
+  const winner = allPlayers.find(p => p.id === winnerEntry.playerId);
+  if (!winner || !style) return null;
+
+  return (
+    <div className="mt-3 mb-4 rounded-xl border border-border overflow-hidden">
+      <div
+        className="flex items-center gap-3 px-3 py-2.5 text-white"
+        style={{ backgroundColor: style.bg }}
+      >
+        <span
+          className="inline-flex items-center justify-center shrink-0 rounded"
+          style={{ backgroundColor: 'rgba(255,255,255,0.18)', width: 26, height: 26 }}
+        >
+          {style.icon}
+        </span>
+        <span className="text-xs font-bold uppercase tracking-wider flex-1">
+          {winnerEntry.specialVictory}
+        </span>
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-white/20 px-2 py-0.5 rounded-full">
+          <Crown className="h-3 w-3" /> {winner.name}
+        </span>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, X, Dices, Check, Crown, Package, Target, Rocket, Landmark } from 'lucide-react';
+import { Search, X, Dices, Check, Crown, Package, Target, Rocket, Landmark, Award } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Game, Player, PlayerScore, ScoreCategory } from '../types';
 import { cn } from '../utils/cn';
@@ -7,6 +7,7 @@ import { GameCover } from './GameCover';
 import {
   DUEL_PAD_METADATA_ORDER,
   DUEL_PAD_ROW_LABELS,
+  SUPREMACY_OPTIONS,
   buildDuelPadCategories,
   getDuelPadRowStyle,
   isDuelPadCategoryKind,
@@ -209,6 +210,163 @@ function DuelPadScorepad({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Bloque de supremacías tipo 7 Wonders Duel: tres checkbox-cards que
+ *  sustituyen tanto la sección "Victoria especial" como la de "Ganador".
+ *  Al marcar una supremacía se muestra el selector del jugador ganador. */
+function DuelSupremacyPicker({
+  selectedPlayers,
+  specialVictories,
+  setSpecialVictories,
+  setWinnerId,
+  getPlayerTotal,
+}: {
+  selectedPlayers: Player[];
+  specialVictories: Record<string, string>;
+  setSpecialVictories: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setWinnerId: React.Dispatch<React.SetStateAction<string>>;
+  getPlayerTotal: (playerId: string) => number;
+}) {
+  const winnerBySupremacy = (supType: string): string | undefined =>
+    Object.entries(specialVictories).find(([, v]) => v === supType)?.[0];
+
+  // La supremacía activa es aquella que tiene un ganador asignado. Se permite
+  // activar visualmente sin ganador para mostrar la sección de selección.
+  const activeSupType = Object.values(specialVictories)[0] as string | undefined;
+
+  const toggleSupremacy = (supType: string) => {
+    const currentWinner = winnerBySupremacy(supType);
+    if (currentWinner) {
+      // Desactivar: limpiamos la supremacía activa y el winnerId si apuntaba aquí.
+      setSpecialVictories(prev => {
+        const next = { ...prev };
+        delete next[currentWinner];
+        return next;
+      });
+      setWinnerId(prev => (prev === currentWinner ? '' : prev));
+    } else {
+      // Activar visualmente: limpiamos cualquier supremacía previa y marcamos
+      // esta como activa usando un "pending" interno basado en el primer jugador
+      // seleccionado para mostrar el winner; si no hay, queda pendiente de pick.
+      setSpecialVictories(() => {
+        const next: Record<string, string> = {};
+        if (selectedPlayers.length > 0) {
+          // Reusamos el primer jugador como placeholder para activar el flag visual.
+          next[selectedPlayers[0].id] = supType;
+          // Lo movemos a winnerId para que determineWinner lo detecte.
+        }
+        return next;
+      });
+      if (selectedPlayers.length > 0) {
+        setWinnerId(selectedPlayers[0].id);
+      }
+    }
+  };
+
+  const pickWinner = (supType: string, playerId: string) => {
+    setSpecialVictories(prev => {
+      const next: Record<string, string> = {};
+      // Eliminar cualquier supremacía que tuviera este jugador o este tipo.
+      for (const [pid, v] of Object.entries(prev)) {
+        if (pid !== playerId && v !== supType) next[pid] = v;
+      }
+      next[playerId] = supType;
+      return next;
+    });
+    setWinnerId(playerId);
+  };
+
+  return (
+    <div className="glass-card p-4">
+      <h3 className="text-sm font-bold text-foreground mb-1 flex items-center gap-2">
+        <Award className="h-4 w-4" /> ¿Cómo terminó la partida?
+      </h3>
+      <p className="text-xs text-muted-foreground mb-3">
+        Marca la supremacía que decidió la partida (o déjalas vacías si terminó al agotar la edad 3).
+      </p>
+      <div className="space-y-2">
+        {SUPREMACY_OPTIONS.map(sup => {
+          const winnerIdForSup = winnerBySupremacy(sup.type);
+          const isActive = activeSupType === sup.type;
+          const style = getDuelPadRowStyle(sup.meta);
+          const winnerPlayer = winnerIdForSup
+            ? selectedPlayers.find(p => p.id === winnerIdForSup)
+            : null;
+          return (
+            <div
+              key={sup.type}
+              className={cn(
+                'rounded-xl border-2 transition-all overflow-hidden',
+                isActive ? 'border-foreground/40 shadow-sm' : 'border-border'
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => toggleSupremacy(sup.type)}
+                className={cn(
+                  'w-full flex items-center gap-3 p-3 text-left transition-colors',
+                  isActive ? 'text-white' : 'text-foreground hover:bg-secondary'
+                )}
+                style={isActive ? { backgroundColor: style.bg } : undefined}
+              >
+                <span
+                  className={cn(
+                    'w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all',
+                    isActive ? 'bg-white border-white' : 'bg-transparent border-muted-foreground/50'
+                  )}
+                >
+                  {isActive && <Check className="h-4 w-4" style={{ color: style.bg }} />}
+                </span>
+                <span
+                  className="inline-flex items-center justify-center shrink-0 rounded"
+                  style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.18)' : style.iconBg, width: 28, height: 28 }}
+                >
+                  {style.icon}
+                </span>
+                <span className="text-sm font-bold uppercase tracking-wider flex-1">
+                  {sup.label}
+                </span>
+                {winnerPlayer && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold bg-white/20 px-2 py-0.5 rounded-full">
+                    <Crown className="h-3 w-3" /> {winnerPlayer.name}
+                  </span>
+                )}
+              </button>
+
+              <div
+                className={cn(
+                  'flex flex-wrap items-center gap-1.5 px-3 py-2.5 border-t border-black/10',
+                  isActive ? 'bg-secondary' : 'bg-secondary/60'
+                )}
+              >
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mr-1">
+                  Ganador:
+                </span>
+                {selectedPlayers.map(p => {
+                  const isWinner = specialVictories[p.id] === sup.type;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => pickWinner(sup.type, p.id)}
+                      className={cn(
+                        'chip text-xs',
+                        isWinner && 'bg-amber-500 text-white border-transparent'
+                      )}
+                    >
+                      {p.name}
+                      <span className="text-[10px] opacity-70">({getPlayerTotal(p.id)})</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -577,7 +735,10 @@ export default function PlaySession() {
           </div>
         </div>
 
-        {hasSpecialVictory && allSpecialVictoryTypes.length > 0 && (
+        {/* En modo Duel Pad la sección "Victoria especial" se sustituye por el
+            bloque de supremacías de la parte inferior. Para el resto de juegos
+            se mantiene la lógica clásica. */}
+        {!useDuelPad && hasSpecialVictory && allSpecialVictoryTypes.length > 0 && (
           <div className="glass-card p-4 border-amber-200 bg-amber-50">
             <h3 className="text-amber-700 font-bold text-sm mb-2 flex items-center gap-2">⚡ Victoria especial</h3>
             <p className="text-xs text-muted-foreground mb-3">Si alguien ganó por una condición especial, selecciónalo. No será necesario introducir puntos.</p>
@@ -597,7 +758,7 @@ export default function PlaySession() {
           </div>
         )}
 
-        {!hasAnySpecialVictory && useDuelPad && selectedGame && (
+        {useDuelPad && selectedGame && (
           <DuelPadScorepad
             game={selectedGame}
             selectedPlayers={selectedPlayers}
@@ -606,7 +767,7 @@ export default function PlaySession() {
           />
         )}
 
-        {!hasAnySpecialVictory && !useDuelPad && (
+        {!useDuelPad && !hasAnySpecialVictory && (
           <div className="space-y-3">
             {selectedPlayers.map(player => (
               <div key={player.id} className="glass-card p-4">
@@ -641,7 +802,17 @@ export default function PlaySession() {
           </div>
         )}
 
-        {!hasAnySpecialVictory && (
+        {useDuelPad && (
+          <DuelSupremacyPicker
+            selectedPlayers={selectedPlayers}
+            specialVictories={specialVictories}
+            setSpecialVictories={setSpecialVictories}
+            setWinnerId={setWinnerId}
+            getPlayerTotal={getPlayerTotal}
+          />
+        )}
+
+        {!useDuelPad && !hasAnySpecialVictory && (
           <div className="glass-card p-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Ganador</h3>
             <div className="flex gap-2 flex-wrap">

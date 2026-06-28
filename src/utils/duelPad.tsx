@@ -223,7 +223,6 @@ export const DUEL_PAD_ROW_ORDER: DuelPadRowKind[] = [
   'maravilla',
   'wonder_moneda',
   'moneda',
-  'wonder_derrota',
   'wonder_progreso',
   'wonder_total',
   'wonder_supremacia_militar',
@@ -246,7 +245,6 @@ export function buildDuelPadCategories(): ScoreCategory[] {
     { id: 'etapa', name: 'Etapas', metadata: 'maravilla' },
     { id: 'moneda_v', name: 'Monedas V', metadata: 'wonder_moneda' },
     { id: 'moneda_a', name: 'Monedas A', metadata: 'moneda' },
-    { id: 'derrota', name: 'Derrota', metadata: 'wonder_derrota' },
     { id: 'progreso', name: 'Progreso', metadata: 'wonder_progreso' },
     { id: 'total', name: 'Total', metadata: 'wonder_total' },
     { id: 'sup_mil', name: 'Supremacía M.', metadata: 'wonder_supremacia_militar' },
@@ -286,6 +284,17 @@ export const DUEL_PAD_ROW_LABELS: Record<DuelPadRowKind, string> = {
   general: 'General',
 };
 
+/**
+ * Tipos de supremacía reconocidas como condición de victoria del scorepad.
+ * Se mantienen sincronizados con `specialVictoryTypes` del juego semilla.
+ */
+export const SUPREMACY_TYPES = [
+  'Supremacía Militar',
+  'Supremacía Científica',
+  'Supremacía Civil',
+] as const;
+export type SupremacyType = typeof SUPREMACY_TYPES[number];
+
 /** Categorías del scorepad Duel en el orden visual de la imagen. */
 export const DUEL_PAD_METADATA_ORDER: ScoreCategoryMetadata[] = [
   'wonder_civil',
@@ -296,10 +305,20 @@ export const DUEL_PAD_METADATA_ORDER: ScoreCategoryMetadata[] = [
   'maravilla',
   'wonder_moneda',
   'moneda',
-  'wonder_derrota',
   'wonder_progreso',
   'wonder_total',
   'wonder_supremacia_militar',
   'wonder_supremacia_cientifica',
   'wonder_supremacia_civil',
 ];
+
+/** Etiquetas mostradas en las supremacy cards de la sección inferior. */
+export const SUPREMACY_OPTIONS: { type: string; label: string; meta: ScoreCategoryMetadata }[] = [
+  { type: 'Supremacía Militar', label: 'Supremacía Militar', meta: 'wonder_supremacia_militar' },
+  { type: 'Supremacía Científica', label: 'Supremacía Científica', meta: 'wonder_supremacia_cientifica' },
+  { type: 'Supremacía Civil', label: 'Supremacía Civil', meta: 'wonder_supremacia_civil' },
+];
+
+export function supremacyMetaFor(type: string): ScoreCategoryMetadata | undefined {
+  return SUPREMACY_OPTIONS.find(s => s.type === type)?.meta;
+}
