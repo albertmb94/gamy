@@ -286,10 +286,10 @@ select.input-field { appearance: none; -webkit-appearance: none; }
   background: linear-gradient(135deg, hsl(220 14% 96%), hsl(220 14% 90%));
 }
 
-/* ----- App frame: padding extra para dejar sitio a la barra "now playing" + nav ----- */
+/* ----- App frame: padding extra para dejar sitio al bottom nav ----- */
 .app-main {
   flex: 1;
-  padding: 1rem 1rem 11rem 1rem;
+  padding: 1rem 1rem 6rem 1rem;
   overflow-y: auto;
   overflow-x: hidden;
 }
