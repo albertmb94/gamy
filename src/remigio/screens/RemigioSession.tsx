@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Play, Pause, Trash2 } from 'lucide-react';
+import { Play, Pause, Trash2, ArrowLeft } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -11,6 +11,7 @@ import { RoundForm } from '../components/RoundForm';
 import { RoundHistory } from '../components/RoundHistory';
 import { RoundPaymentSummary } from '../components/RoundPaymentSummary';
 import { PaymentSummary } from '../components/PaymentSummary';
+import { cn } from '../../utils/cn';
 
 export function RemigioSession({ sessionId }: { sessionId: string }) {
   const { sessions, setStatus, remove, goList } = useRemigioStore();
@@ -20,9 +21,8 @@ export function RemigioSession({ sessionId }: { sessionId: string }) {
   if (!session) {
     return (
       <div className="max-w-xl mx-auto space-y-4">
-        <Button variant="ghost" size="sm" onClick={goList}>
+        <Button variant="ghost" size="icon" onClick={goList} className="rounded-full">
           <ArrowLeft className="h-4 w-4" />
-          Volver
         </Button>
         <Card>
           <CardContent className="py-6 text-sm text-muted-foreground">La partida no existe.</CardContent>
@@ -44,18 +44,23 @@ export function RemigioSession({ sessionId }: { sessionId: string }) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goList}>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button variant="ghost" size="icon" onClick={goList} className="rounded-full shrink-0">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{session.name}</h1>
+          <div className="min-w-0">
+            <h2 className="text-xl font-extrabold tracking-tight truncate">{session.name}</h2>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant={isFinished ? 'outline' : isInProgress ? 'success' : 'secondary'}>{statusLabel(session.status)}</Badge>
-              <span className="text-sm text-muted-foreground">
-                {session.players.length} jugadores · Objetivo: {session.target_score} pts
+              <span className={cn(
+                'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full',
+                isFinished ? 'bg-secondary text-muted-foreground' : isInProgress ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+              )}>
+                {statusLabel(session.status)}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {session.players.length} jugadores · Objetivo {session.target_score}
               </span>
             </div>
           </div>
@@ -63,25 +68,25 @@ export function RemigioSession({ sessionId }: { sessionId: string }) {
 
         <div className="flex gap-2">
           {isWaiting && (
-            <Button onClick={() => setStatus(session.id, 'in_progress')}>
+            <Button onClick={() => setStatus(session.id, 'in_progress')} className="rounded-full">
               <Play className="h-4 w-4" />
-              Iniciar Partida
+              Iniciar
             </Button>
           )}
           {isInProgress && (
-            <Button variant="outline" onClick={() => setStatus(session.id, 'paused')}>
+            <Button variant="outline" onClick={() => setStatus(session.id, 'paused')} className="rounded-full">
               <Pause className="h-4 w-4" />
               Pausar
             </Button>
           )}
           {isPaused && (
-            <Button onClick={() => setStatus(session.id, 'in_progress')}>
+            <Button onClick={() => setStatus(session.id, 'in_progress')} className="rounded-full">
               <Play className="h-4 w-4" />
               Reanudar
             </Button>
           )}
           {!isFinished && (
-            <Button variant="destructive" size="icon" onClick={handleDelete} title="Cancelar partida">
+            <Button variant="outline" size="icon" onClick={handleDelete} className="rounded-full" title="Cancelar partida">
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
@@ -89,11 +94,9 @@ export function RemigioSession({ sessionId }: { sessionId: string }) {
       </div>
 
       {isPaused && (
-        <Card className="bg-amber-50 border-amber-200">
-          <CardContent className="py-3">
-            <p className="text-sm text-amber-800">Partida pausada. Reanúdala cuando quieras para seguir jugando.</p>
-          </CardContent>
-        </Card>
+        <div className="glass-card p-3 border-amber-200">
+          <p className="text-sm text-amber-700 font-medium">Partida pausada. Reanúdala cuando quieras para seguir jugando.</p>
+        </div>
       )}
 
       <Scoreboard session={session} />
@@ -106,24 +109,25 @@ export function RemigioSession({ sessionId }: { sessionId: string }) {
 
       {isFinished && <PaymentSummary session={session} />}
 
-      <Card className="bg-muted/40">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Configuración de pagos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground">Por ronda:</span> <span className="font-medium">{session.price_per_round}€</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Por partida:</span> <span className="font-medium">{session.price_per_game}€</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Reenganche:</span> <span className="font-medium">{session.price_per_reentry}€</span>
-            </div>
+      <div className="glass-card overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-border">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Configuración de pagos</h3>
+        </div>
+        <div className="grid grid-cols-3 divide-x divide-border">
+          <div className="text-center py-3">
+            <p className="text-[10px] text-muted-foreground">Por ronda</p>
+            <p className="text-sm font-bold tabular-nums">{session.price_per_round}€</p>
           </div>
-        </CardContent>
-      </Card>
+          <div className="text-center py-3">
+            <p className="text-[10px] text-muted-foreground">Por partida</p>
+            <p className="text-sm font-bold tabular-nums">{session.price_per_game}€</p>
+          </div>
+          <div className="text-center py-3">
+            <p className="text-[10px] text-muted-foreground">Reenganche</p>
+            <p className="text-sm font-bold tabular-nums">{session.price_per_reentry}€</p>
+          </div>
+        </div>
+      </div>
 
       <ConfirmDialog
         open={confirmDelete}

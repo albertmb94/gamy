@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, SlidersHorizontal, Heart, X, Pencil, Trash2, Package, Spade, ChevronRight, Swords } from 'lucide-react';
+import { Search, Plus, SlidersHorizontal, Heart, X, Pencil, Trash2, Package, Spade, Swords, Play } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useRemigioStore } from '../store/useRemigioStore';
 import { Game, GameType, ScoringTemplate, ScoreCategory } from '../types';
@@ -56,8 +56,8 @@ function DurationBadge({ minutes }: { minutes?: number }) {
   const mins = minutes % 60;
   const label = hrs > 0 ? `${hrs}h${mins > 0 ? `${mins}` : ''}` : `${mins}'`;
   return (
-    <span className="text-[10px] font-medium bg-secondary text-muted-foreground px-2 py-0.5 rounded-full border border-border flex items-center gap-1">
-      <span>⏱</span>{label}
+    <span className="text-[11px] font-medium text-muted-foreground">
+      {label}
     </span>
   );
 }
@@ -161,7 +161,7 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
       <div className="modal-panel p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold text-foreground">{gameToEdit ? 'Editar Juego' : 'Nuevo Juego'}</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="w-9 h-9 rounded-full bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="space-y-5">
@@ -172,7 +172,7 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
               <input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="URL de imagen o /images/mi-juego.jpg"
                 className="input-field" />
               {imageUrl && (
-                <div className="h-28 w-28 rounded-xl overflow-hidden border border-border bg-secondary">
+                <div className="h-28 w-28 rounded-2xl overflow-hidden border border-border bg-secondary">
                   <img src={imageUrl} alt="" className="w-full h-full object-cover" onError={e => (e.currentTarget.style.display = 'none')} />
                 </div>
               )}
@@ -236,7 +236,7 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
               </div>
 
               <button type="button" onClick={applyDuelPadPreset}
-                className="w-full btn btn-secondary py-2.5 text-sm border-dashed">
+                className="w-full btn btn-secondary py-2.5 text-sm">
                 <Swords className="h-4 w-4" /> Usar plantilla 7 Wonders Duel
               </button>
             </div>
@@ -329,9 +329,9 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
   );
 }
 
-// ---- Game Detail ----
+// ---- Game Detail (estilo álbum) ----
 function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
-  const { games, matches, players, deleteGame, setEditingGameId, setShowGameForm, toggleFavorite } = useStore();
+  const { games, matches, players, deleteGame, setEditingGameId, setShowGameForm, toggleFavorite, setTab, setSelectedGameId } = useStore();
   const expansions = games.filter(g => g.baseGameId === game.id);
   const baseGame = game.isExpansion ? games.find(g => g.id === game.baseGameId) : null;
   const gameMatches = matches.filter(m => m.gameId === game.id);
@@ -348,94 +348,125 @@ function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
     }
   };
 
+  const handlePlay = () => {
+    setSelectedGameId(game.id);
+    setTab('play');
+    onClose();
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-panel overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className={`h-52 w-full relative overflow-hidden ${typeGradient(game.types[0])}`}>
-          {game.imageUrl ? (
-            <img src={game.imageUrl} alt={game.name} className="w-full h-full object-cover"
-              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-          ) : (
-            <GameCover game={game} large />
-          )}
+        {/* Cabecera estilo "Album detail" de la imagen */}
+        <div className="px-5 pt-4 pb-5 flex items-center justify-between">
+          <button onClick={onClose} className="w-9 h-9 rounded-full bg-card border border-border text-foreground flex items-center justify-center">
+            <X className="h-4 w-4" />
+          </button>
+          <div className="text-center leading-tight">
+            <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold">{game.isExpansion ? 'Expansión' : 'Juego'}</p>
+            <p className="text-sm font-bold text-foreground truncate max-w-[200px] mx-auto">{game.name}</p>
+          </div>
           <button
             onClick={() => toggleFavorite(game.id)}
             title={game.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-            className={cn('absolute top-3 left-3 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur transition-all', game.isFavorite ? 'bg-rose-500 text-white' : 'bg-white/80 text-foreground hover:bg-white')}>
+            className={cn('w-9 h-9 rounded-full flex items-center justify-center transition-all', game.isFavorite ? 'bg-rose-500 text-white' : 'bg-card border border-border text-foreground hover:bg-secondary')}>
             <Heart className={cn('h-4 w-4', game.isFavorite && 'fill-current')} />
           </button>
-          <button onClick={onClose} className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/80 backdrop-blur text-foreground flex items-center justify-center hover:bg-white transition-colors"><X className="h-4 w-4" /></button>
         </div>
 
-        <div className="p-5">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-foreground mb-1">{game.name}</h2>
-            {game.isExpansion && baseGame && (
-              <p className="text-sm text-muted-foreground font-medium mb-2 flex items-center gap-1"><Package className="h-3.5 w-3.5" /> Expansión de {baseGame.name}</p>
-            )}
-            <div className="flex items-center gap-3 mb-3">
-              {game.difficulty ? <StarRating value={game.difficulty} size="xs" /> : null}
-              <DurationBadge minutes={game.duration} />
+        <div className="px-5 pb-5">
+          <div className="flex items-start gap-4">
+            <div className={`w-32 h-32 rounded-2xl overflow-hidden shrink-0 ${typeGradient(game.types[0])}`}>
+              {game.imageUrl ? (
+                <img src={game.imageUrl} alt={game.name} className="w-full h-full object-cover"
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+              ) : (
+                <GameCover game={game} large />
+              )}
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {game.types.map(t => (
-                <span key={t} className="chip chip-active text-[10px]">{GAME_EMOJIS[t]} {t}</span>
-              ))}
+            <div className="flex-1 min-w-0 pt-1">
+              <p className="text-[11px] text-muted-foreground">
+                {game.isExpansion && baseGame ? `${baseGame.name}` : 'Ludoteca'} · {gameMatches.length} partidas · {game.duration ? `${game.duration}'` : '—'}
+              </p>
+              <h2 className="text-2xl font-extrabold tracking-tight text-foreground leading-tight mt-1">{game.name}</h2>
+              {game.isExpansion && baseGame && (
+                <p className="text-xs text-muted-foreground font-medium mt-1 flex items-center gap-1"><Package className="h-3.5 w-3.5" /> Expansión de {baseGame.name}</p>
+              )}
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {game.types.map(t => (
+                  <span key={t} className="text-[11px] bg-secondary text-muted-foreground px-2.5 py-1 rounded-full font-medium">
+                    {GAME_EMOJIS[t]} {t}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="glass-card p-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Puntuación</h3>
-              <p className="text-sm text-foreground font-medium mb-2">
-                {game.scoringTemplate.type === 'simple' ? 'Puntuación simple' : 'Puntuación compleja'}
-              </p>
-              {game.scoringTemplate.type === 'complex' && (
-                <div className="flex flex-wrap gap-1.5">
-                  {game.scoringTemplate.categories.map(c => (
-                    <span key={c.id} className="chip text-[10px]">
-                      {c.name} {c.metadata && c.metadata !== 'general' && <span className="text-muted-foreground">({c.metadata})</span>}
-                    </span>
-                  ))}
-                </div>
-              )}
+          <div className="flex gap-2 mt-5">
+            <button onClick={handlePlay} className="btn btn-primary flex-1 py-3">
+              <Play className="h-4 w-4 fill-current" /> Jugar
+            </button>
+            <button onClick={handleEdit} className="btn btn-secondary py-3 px-5"><Pencil className="h-4 w-4" /></button>
+            <button onClick={handleDelete} className="btn btn-danger py-3 px-4"><Trash2 className="h-4 w-4" /></button>
+          </div>
+
+          {/* Track-list: secciones con índice y meta */}
+          <div className="mt-6 space-y-1">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1 mb-2">Detalles</h3>
+
+            <div className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary/60 transition-colors">
+              <span className="text-xs font-bold text-muted-foreground w-6 tabular-nums">01</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">Puntuación</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {game.scoringTemplate.type === 'simple' ? 'Simple · total único' : `Compleja · ${game.scoringTemplate.categories.length} categorías`}
+                </p>
+              </div>
               {game.allowSpecialVictory && (
-                <div className="mt-3 pt-3 border-t border-border">
-                  <span className="text-xs text-amber-600 font-semibold">⚡ Victorias especiales: </span>
-                  <span className="text-xs text-foreground">{game.specialVictoryTypes?.join(', ')}</span>
-                </div>
+                <span className="text-[11px] bg-secondary text-muted-foreground px-2 py-0.5 rounded-full">⚡ {game.specialVictoryTypes?.length || 0}</span>
               )}
             </div>
 
             {expansions.length > 0 && (
-              <div className="glass-card p-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Expansiones</h3>
-                <div className="space-y-1.5">
-                  {expansions.map(exp => (
-                    <div key={exp.id} className="bg-secondary rounded-lg px-3 py-2 text-sm text-foreground border border-border flex items-center gap-1.5"><Package className="h-3.5 w-3.5 text-muted-foreground" /> {exp.name}</div>
-                  ))}
+              <div className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary/60 transition-colors">
+                <span className="text-xs font-bold text-muted-foreground w-6 tabular-nums">02</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">Expansiones</p>
+                  <p className="text-xs text-muted-foreground truncate">{expansions.map(e => e.name).join(', ')}</p>
+                </div>
+                <span className="text-[11px] bg-secondary text-muted-foreground px-2 py-0.5 rounded-full">{expansions.length}</span>
+              </div>
+            )}
+
+            {game.scoringTemplate.type === 'complex' && (
+              <div className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary/60 transition-colors">
+                <span className="text-xs font-bold text-muted-foreground w-6 tabular-nums">03</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">Categorías</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {game.scoringTemplate.categories.map(c => c.name).join(' · ')}
+                  </p>
                 </div>
               </div>
             )}
 
-            <div className="glass-card p-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Estadísticas</h3>
-              <p className="text-sm text-muted-foreground">Partidas jugadas: <span className="text-foreground font-bold">{gameMatches.length}</span></p>
-              {gameMatches.length > 0 && (() => {
-                const winnerCounts: Record<string, number> = {};
-                gameMatches.forEach(m => { if (m.winnerId) winnerCounts[m.winnerId] = (winnerCounts[m.winnerId] || 0) + 1; });
-                const topWinnerId = Object.entries(winnerCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
-                const topWinner = players.find(p => p.id === topWinnerId);
-                return topWinner ? (
-                  <p className="text-sm text-muted-foreground mt-1">Mejor jugador: <span className="text-foreground font-bold">{topWinner.name}</span></p>
-                ) : null;
-              })()}
-            </div>
-          </div>
-
-          <div className="flex gap-3 mt-5">
-            <button onClick={handleEdit} className="btn btn-secondary flex-1 py-3"><Pencil className="h-4 w-4" /> Editar</button>
-            <button onClick={handleDelete} className="btn btn-danger py-3 px-5"><Trash2 className="h-4 w-4" /></button>
+            {gameMatches.length > 0 && (() => {
+              const winnerCounts: Record<string, number> = {};
+              gameMatches.forEach(m => { if (m.winnerId) winnerCounts[m.winnerId] = (winnerCounts[m.winnerId] || 0) + 1; });
+              const topWinnerId = Object.entries(winnerCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+              const topWinner = players.find(p => p.id === topWinnerId);
+              return (
+                <div className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary/60 transition-colors">
+                  <span className="text-xs font-bold text-muted-foreground w-6 tabular-nums">04</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">Mejor jugador</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {topWinner ? `${topWinner.name} · ${winnerCounts[topWinnerId]} victoria${winnerCounts[topWinnerId] > 1 ? 's' : ''}` : '—'}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -443,7 +474,7 @@ function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
   );
 }
 
-// ---- Remigio featured tile ----
+// ---- Remigio featured tile (estilo álbum destacado) ----
 function RemigioTile() {
   const openModule = useRemigioStore(s => s.openModule);
   const sessions = useRemigioStore(s => s.sessions);
@@ -451,22 +482,22 @@ function RemigioTile() {
   return (
     <button
       onClick={openModule}
-      className="col-span-2 sm:col-span-3 glass-card overflow-hidden text-left hover:border-foreground/30 transition-colors animate-slide-up"
+      className="col-span-2 sm:col-span-3 glass-card overflow-hidden text-left hover:border-foreground/20 transition-colors animate-slide-up"
     >
       <div className="flex items-center gap-4 p-4">
-        <div className="w-14 h-14 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
-          <Spade className="h-7 w-7" />
+        <div className="w-16 h-16 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+          <Spade className="h-8 w-8" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-foreground">Remigio</h3>
-            <span className="chip text-[10px]">Juego en vivo</span>
-          </div>
+          <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold">Juego en vivo</p>
+          <h3 className="text-base font-bold text-foreground truncate">Remigio</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Rondas, reenganches y pagos · {active > 0 ? `${active} partida${active > 1 ? 's' : ''} activa${active > 1 ? 's' : ''}` : 'toca para jugar'}
+            Rondas, reenganches y pagos · {active > 0 ? `${active} activa${active > 1 ? 's' : ''}` : 'toca para jugar'}
           </p>
         </div>
-        <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+        <span className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+          <Play className="h-5 w-5 fill-current" />
+        </span>
       </div>
     </button>
   );
@@ -527,14 +558,13 @@ export default function Library() {
   const gameToEdit = editingGameId ? games.find(g => g.id === editingGameId) : undefined;
   const activeFiltersCount = (filterType ? 1 : 0) + (filterDifficulty ? 1 : 0) + (filterDurationIdx ? 1 : 0) + (favoritesOnly ? 1 : 0);
 
-  // El acceso a Remigio se muestra cuando no hay un filtro que lo excluiría.
   const showRemigio = !search && !favoritesOnly && !filterDifficulty && !filterDurationIdx && (filterType === '' || filterType === 'Cartas');
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Ludoteca</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Ludoteca</h2>
           <p className="text-sm text-muted-foreground">{baseGames.length} juegos</p>
         </div>
         <button onClick={() => { setEditingGameId(null); setShowGameForm(true); }}
@@ -546,21 +576,21 @@ export default function Library() {
       {/* Search + filters */}
       <div className="flex items-center gap-2">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar juego..."
             className="input-field pl-10" />
         </div>
         <button
           onClick={() => setFavoritesOnly(v => !v)}
           title={favoritesOnly ? 'Mostrando solo favoritos' : 'Mostrar solo favoritos'}
-          className={`btn px-3.5 py-2.5 ${favoritesOnly ? 'btn-primary' : 'btn-secondary'}`}>
+          className={cn('btn px-3.5 py-2.5', favoritesOnly ? 'btn-primary' : 'btn-secondary')}>
           <Heart className={cn('h-4 w-4', favoritesOnly && 'fill-current')} />
         </button>
         <button onClick={() => setShowFilters(!showFilters)}
-          className={`relative btn ${showFilters ? 'btn-primary' : 'btn-secondary'} px-3.5 py-2.5`}>
+          className={cn('relative btn', showFilters ? 'btn-primary' : 'btn-secondary', 'px-3.5 py-2.5')}>
           <SlidersHorizontal className="h-4 w-4" />
           {activeFiltersCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-foreground text-background rounded-full text-[10px] flex items-center justify-center font-bold border-2 border-background">
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground rounded-full text-[10px] flex items-center justify-center font-bold">
               {activeFiltersCount}
             </span>
           )}
@@ -569,7 +599,6 @@ export default function Library() {
 
       {/* Sort selector */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Ordenar:</span>
         {SORT_OPTIONS.map(opt => (
           <button key={opt.key} onClick={() => setSortBy(opt.key)}
             className={`chip whitespace-nowrap ${sortBy === opt.key ? 'chip-active' : ''}`}>
@@ -624,46 +653,44 @@ export default function Library() {
         </div>
       )}
 
-      {/* Game Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {/* Game Grid — estilo cuadrícula de álbums */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {showRemigio && <RemigioTile />}
         {sorted.map(game => {
           const expansionCount = games.filter(g => g.baseGameId === game.id).length;
           return (
-            <button key={game.id} onClick={() => setSelectedGame(game)}
-              className="glass-card overflow-hidden text-left hover:border-foreground/30 transition-colors group animate-slide-up">
-              <div className={`h-36 relative overflow-hidden ${typeGradient(game.types[0])}`}>
+            <div key={game.id} className="text-left animate-slide-up group">
+              <button
+                onClick={() => setSelectedGame(game)}
+                className="block w-full aspect-square rounded-2xl overflow-hidden relative bg-gradient-to-br from-zinc-100 to-zinc-200"
+              >
                 {game.imageUrl ? (
                   <img src={game.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                 ) : (
-                  <GameCover game={game} className="group-hover:scale-105 transition-transform duration-500" />
+                  <GameCover game={game} className="group-hover:scale-105 transition-transform duration-500 rounded-2xl" />
                 )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleFavorite(game.id); }}
-                  title={game.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                  className={cn('absolute top-2 left-2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all', game.isFavorite ? 'bg-rose-500 text-white' : 'bg-white/80 text-foreground hover:bg-white')}>
-                  <Heart className={cn('h-4 w-4', game.isFavorite && 'fill-current')} />
-                </button>
                 {expansionCount > 0 && (
                   <span className="absolute top-2 right-2 text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-bold backdrop-blur-sm">
                     +{expansionCount}
                   </span>
                 )}
-              </div>
-              <div className="p-3">
-                <h3 className="text-foreground text-sm font-bold leading-tight line-clamp-2 mb-2">{game.name}</h3>
-                <div className="flex flex-wrap items-center gap-1 mb-2">
-                  {game.types.slice(0, 2).map(t => (
-                    <span key={t} className="text-[10px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded border border-border">{t}</span>
-                  ))}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleFavorite(game.id); }}
+                title={game.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                className={cn('absolute -mt-7 ml-2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all border border-white/20 shadow-sm', game.isFavorite ? 'bg-rose-500 text-white border-transparent' : 'bg-black/40 text-white hover:bg-black/55')}>
+                <Heart className={cn('h-3.5 w-3.5', game.isFavorite && 'fill-current')} />
+              </button>
+              <div className="pt-2 px-1">
+                <h3 className="text-foreground text-sm font-bold leading-tight truncate">{game.name}</h3>
+                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+                  {game.types[0] && <span className="truncate">{game.types[0]}</span>}
+                  {game.types[0] && game.duration && <span>·</span>}
+                  {game.duration && <DurationBadge minutes={game.duration} />}
                 </div>
-                <div className="flex items-center justify-between">
-                  {game.difficulty ? <StarRating value={game.difficulty} size="xs" /> : <span />}
-                  <DurationBadge minutes={game.duration} />
-                </div>
               </div>
-            </button>
+            </div>
           );
         })}
       </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlusCircle, Users, Trophy, Pause, Play, Trash2 } from 'lucide-react';
+import { PlusCircle, Users, Trophy, Play, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -7,44 +7,39 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useRemigioStore } from '../../store/useRemigioStore';
 import { statusLabel } from '../engine';
 import { RemigioSession } from '../types';
+import { cn } from '../../utils/cn';
 
 function SessionCard({ session, onOpen, onDelete }: { session: RemigioSession; onOpen: () => void; onDelete: () => void }) {
   const finished = session.status === 'finished';
   const paused = session.status === 'paused' || (session.status === 'waiting' && session.rounds.length > 0);
   return (
-    <Card className={finished ? 'opacity-80' : 'hover:border-foreground/30 transition-colors'}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base truncate">{session.name}</CardTitle>
-          <Badge variant={finished ? 'outline' : paused ? 'secondary' : 'success'}>{statusLabel(session.status)}</Badge>
+    <div className="glass-card overflow-hidden text-left animate-slide-up">
+      <div className="flex items-center gap-3 p-4">
+        <div className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+          <Users className="h-5 w-5" />
         </div>
-        <CardDescription className="flex items-center gap-1">
-          <Users className="h-3 w-3" />
-          {session.players.length} jugadores
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            {paused ? (
-              <span className="flex items-center gap-1 text-amber-600">
-                <Pause className="h-3 w-3" /> {session.rounds.length} rondas
-              </span>
-            ) : (
-              <>Objetivo: {session.target_score} pts</>
-            )}
-          </div>
-          <div className="flex gap-2 items-center">
-            <Button variant="ghost" size="icon" onClick={onDelete} title="Eliminar">
-              <Trash2 className="h-4 w-4 text-muted-foreground" />
-            </Button>
-            <Button size="sm" variant={finished ? 'outline' : 'default'} onClick={onOpen}>
-              {finished ? 'Ver resumen' : paused ? (<><Play className="h-4 w-4" />Reanudar</>) : 'Ver'}
-            </Button>
-          </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-foreground truncate">{session.name}</p>
+          <p className="text-[11px] text-muted-foreground truncate">
+            {session.players.length} jugadores · {session.rounds.length} rondas · objetivo {session.target_score}
+          </p>
         </div>
-      </CardContent>
-    </Card>
+        <span className={cn(
+          'text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full shrink-0',
+          finished ? 'bg-secondary text-muted-foreground' : paused ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+        )}>
+          {statusLabel(session.status)}
+        </span>
+      </div>
+      <div className="flex items-center justify-end gap-2 px-4 pb-4">
+        <Button variant="ghost" size="icon" onClick={onDelete} title="Eliminar">
+          <Trash2 className="h-4 w-4 text-muted-foreground" />
+        </Button>
+        <Button size="sm" variant={finished ? 'outline' : 'default'} onClick={onOpen} className="rounded-full">
+          {finished ? 'Ver resumen' : paused ? (<><Play className="h-4 w-4" />Reanudar</>) : (<><Play className="h-4 w-4" />Ver</>)}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -60,22 +55,22 @@ export function RemigioList() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Remigio</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Partidas, puntuaciones y pagos.</p>
+          <h2 className="text-3xl font-extrabold tracking-tight">Partidas</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Puntuaciones, rondas y pagos.</p>
         </div>
-        <Button onClick={goNew}>
+        <Button onClick={goNew} className="rounded-full">
           <PlusCircle className="h-4 w-4" />
-          Nueva Partida
+          Nueva
         </Button>
       </div>
 
       {active.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Partidas activas</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">Activas</h3>
+          <div className="grid gap-3">
             {active.map((s) => (
               <SessionCard key={s.id} session={s} onOpen={() => openSession(s.id)} onDelete={() => setPendingDeleteId(s.id)} />
             ))}
@@ -84,9 +79,9 @@ export function RemigioList() {
       )}
 
       {finished.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Partidas finalizadas</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">Finalizadas</h3>
+          <div className="grid gap-3">
             {finished.map((s) => (
               <SessionCard key={s.id} session={s} onOpen={() => openSession(s.id)} onDelete={() => setPendingDeleteId(s.id)} />
             ))}
@@ -95,17 +90,15 @@ export function RemigioList() {
       )}
 
       {sessions.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Trophy className="h-10 w-10 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold">No hay partidas</h3>
-            <p className="text-muted-foreground mb-4 text-sm">Crea tu primera partida de Remigio para empezar.</p>
-            <Button onClick={goNew}>
-              <PlusCircle className="h-4 w-4" />
-              Nueva Partida
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="text-center py-16 glass-card">
+          <Trophy className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+          <p className="text-foreground font-bold">No hay partidas</p>
+          <p className="text-sm text-muted-foreground mb-4">Crea tu primera partida de Remigio para empezar.</p>
+          <Button onClick={goNew} className="rounded-full">
+            <PlusCircle className="h-4 w-4" />
+            Nueva partida
+          </Button>
+        </div>
       )}
 
       <ConfirmDialog

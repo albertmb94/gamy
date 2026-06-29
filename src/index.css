@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
 /* ============================================================
-   Design system — Blanco y negro minimalista (estilo brisca-app)
+   Design system — Estética tipo reproductor de música:
+   fondo gris claro, tarjetas blancas, botones pill negros,
+   navegación inferior negra redondeada con barra "now playing".
    ============================================================ */
 
 @theme inline {
@@ -31,42 +33,41 @@
 }
 
 :root {
-  /* shadcn tokens (light) */
-  --background: 0 0% 100%;
-  --foreground: 0 0% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 3.9%;
+  /* Paleta principal (light) */
+  --background: 220 20% 97%;          /* gris muy claro tipo app de música */
+  --foreground: 0 0% 9%;              /* casi negro para texto */
+  --card: 0 0% 100%;                  /* tarjetas blancas */
+  --card-foreground: 0 0% 9%;
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 3.9%;
-  --primary: 0 0% 9%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 0 0% 96.1%;
-  --secondary-foreground: 0 0% 9%;
-  --muted: 0 0% 96.1%;
-  --muted-foreground: 0 0% 45.1%;
-  --accent: 0 0% 96.1%;
+  --popover-foreground: 0 0% 9%;
+  --primary: 0 0% 9%;                 /* negro para botones principales */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 14% 96%;           /* gris claro para chips/secondary */
+  --secondary-foreground: 0 0% 15%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 46%;
+  --accent: 220 14% 96%;
   --accent-foreground: 0 0% 9%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 89.8%;
-  --input: 0 0% 89.8%;
-  --ring: 0 0% 3.9%;
-  --radius: 0.65rem;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 0 0% 9%;
+  --radius: 0.75rem;
 
-  /* Legacy ludotic variables remapped to the light palette so existing
-     components keep working while looking minimalist. */
-  --text-primary: hsl(0 0% 3.9%);
-  --text-secondary: hsl(0 0% 32%);
-  --text-muted: hsl(0 0% 45.1%);
+  /* Legacy ludotic variables */
+  --text-primary: hsl(0 0% 9%);
+  --text-secondary: hsl(220 9% 35%);
+  --text-muted: hsl(220 9% 46%);
   --accent-color: hsl(0 0% 9%);
 }
 
 .dark {
-  --background: 0 0% 3.9%;
+  --background: 0 0% 4%;
   --foreground: 0 0% 98%;
-  --card: 0 0% 5%;
+  --card: 0 0% 8%;
   --card-foreground: 0 0% 98%;
-  --popover: 0 0% 5%;
+  --popover: 0 0% 8%;
   --popover-foreground: 0 0% 98%;
   --primary: 0 0% 98%;
   --primary-foreground: 0 0% 9%;
@@ -150,26 +151,26 @@ input[type="number"] { -moz-appearance: textfield; }
 /* Ambient glow disabled in the minimalist theme */
 .ambient-glow { display: none; }
 
-/* ----- Cards ----- */
+/* ----- Cards (estilo reproductor: blanco, más redondeadas, sombra muy sutil) ----- */
 .glass-card {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-lg);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
 }
 .glass-card-elevated {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-lg);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-radius: 1rem;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
 }
 
 /* ----- Inputs ----- */
 .input-field {
   width: 100%;
-  background: hsl(var(--background));
+  background: hsl(var(--card));
   border: 1px solid hsl(var(--input));
-  border-radius: var(--radius-md);
+  border-radius: 0.75rem;
   padding: 0.625rem 0.875rem;
   color: hsl(var(--foreground));
   font-size: 0.875rem;
@@ -179,41 +180,42 @@ input[type="number"] { -moz-appearance: textfield; }
 .input-field::placeholder { color: hsl(var(--muted-foreground)); }
 .input-field:focus {
   border-color: hsl(var(--ring));
-  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.15);
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.12);
 }
 select.input-field { appearance: none; -webkit-appearance: none; }
 
-/* ----- Buttons ----- */
+/* ----- Buttons (pill-shaped como en la imagen) ----- */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  font-weight: 500;
-  border-radius: var(--radius-md);
-  padding: 0.5rem 1rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  padding: 0.5rem 1.1rem;
   font-size: 0.875rem;
   transition: all 0.15s ease;
   cursor: pointer;
   border: 1px solid transparent;
   outline: none;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
-.btn:active { transform: scale(0.98); }
+.btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.5; pointer-events: none; }
 .btn-primary {
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
 }
-.btn-primary:hover { background: hsl(var(--primary) / 0.9); }
+.btn-primary:hover { background: hsl(0 0% 15%); }
 .btn-secondary {
-  background: hsl(var(--background));
+  background: hsl(var(--secondary));
   color: hsl(var(--foreground));
-  border-color: hsl(var(--border));
+  border-color: transparent;
 }
-.btn-secondary:hover { background: hsl(var(--secondary)); }
+.btn-secondary:hover { background: hsl(220 14% 92%); }
 .btn-danger {
-  background: hsl(var(--background));
+  background: hsl(var(--card));
   color: hsl(var(--destructive));
   border-color: hsl(var(--destructive) / 0.3);
 }
@@ -224,18 +226,18 @@ select.input-field { appearance: none; -webkit-appearance: none; }
 }
 .btn-success:hover { background: hsl(142 71% 40%); }
 
-/* ----- Chips ----- */
+/* ----- Chips (más planos, estilo tags del reproductor) ----- */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.25rem 0.75rem;
+  padding: 0.3rem 0.85rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 500;
   background: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
-  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -249,8 +251,8 @@ select.input-field { appearance: none; -webkit-appearance: none; }
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   z-index: 50;
   display: flex;
   align-items: flex-end;
@@ -266,11 +268,11 @@ select.input-field { appearance: none; -webkit-appearance: none; }
   overflow-y: auto;
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
-  border-radius: 1.25rem 1.25rem 0 0;
-  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.12);
+  border-radius: 1.5rem 1.5rem 0 0;
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.15);
 }
 @media (min-width: 640px) {
-  .modal-panel { border-radius: var(--radius-lg); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18); }
+  .modal-panel { border-radius: 1.5rem; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18); }
 }
 
 /* ----- Animations ----- */
@@ -281,5 +283,30 @@ select.input-field { appearance: none; -webkit-appearance: none; }
 
 /* ----- Game-type headers: neutral grayscale instead of color gradients ----- */
 [class*="type-gradient-"] {
-  background: linear-gradient(135deg, hsl(0 0% 96%), hsl(0 0% 90%));
+  background: linear-gradient(135deg, hsl(220 14% 96%), hsl(220 14% 90%));
+}
+
+/* ----- App frame: padding extra para dejar sitio a la barra "now playing" + nav ----- */
+.app-main {
+  flex: 1;
+  padding: 1rem 1rem 11rem 1rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ----- "Now playing" pill bar (encima del bottom nav, negra con esquinas
+   redondeadas) ----- */
+.now-playing-bar {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: 1.25rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* ----- Bottom nav (negra, pill, blanca con icono activo) ----- */
+.bottom-nav {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: 1.25rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, X, Dices, Check, Crown, Package, Target, Rocket, Landmark, Award } from 'lucide-react';
+import { Search, X, Dices, Check, Crown, Package, Target, Rocket, Award, ArrowLeft } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Game, Player, PlayerScore, ScoreCategory } from '../types';
 import { cn } from '../utils/cn';
@@ -29,20 +29,21 @@ function typeGradient(type: string) {
 
 function StepHeader({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack?: () => void }) {
   return (
-    <div className="flex items-center gap-3 mb-4">
+    <div className="flex items-center gap-3 mb-5">
       {onBack && (
-        <button onClick={onBack} className="btn btn-secondary px-3 py-2 text-sm">← Atrás</button>
+        <button onClick={onBack} className="w-9 h-9 rounded-full bg-card border border-border flex items-center justify-center text-foreground hover:bg-secondary transition-colors">
+          <ArrowLeft className="h-4 w-4" />
+        </button>
       )}
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">{title}</h2>
+        <h2 className="text-2xl font-extrabold tracking-tight text-foreground">{title}</h2>
         {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
       </div>
     </div>
   );
 }
 
-/** Scorepad estilo 7 Wonders Duel: una fila por categoría con su icono
- *  específico, una columna por jugador, total integrado al final. */
+/** Scorepad estilo 7 Wonders Duel. */
 function DuelPadScorepad({
   game,
   selectedPlayers,
@@ -54,16 +55,7 @@ function DuelPadScorepad({
   playerScores: Record<string, Record<string, number>>;
   onScoreChange: (playerId: string, catId: string, value: number) => void;
 }) {
-  // Ordenamos las categorías del juego según el orden canónico del scorepad.
-  // Si el juego no tiene todas, las que falten se rellenan con los valores
-  // por defecto del scorepad (buildDuelPadCategories) para no romper la UI.
   const defaults = useMemo(() => buildDuelPadCategories(), []);
-  const catsById = useMemo(() => {
-    const m = new Map<string, ScoreCategory>();
-    game.scoringTemplate.categories.forEach(c => m.set(c.id, c));
-    return m;
-  }, [game]);
-
   const orderedCats: ScoreCategory[] = useMemo(() => {
     const out: ScoreCategory[] = [];
     const seen = new Set<string>();
@@ -78,8 +70,6 @@ function DuelPadScorepad({
         out.push(cat);
       }
     });
-    // Añadimos cualquier categoría extra del juego (p.ej. expansiones) al final,
-    // exceptuando las que estén explícitamente excluidas (Derrota, supremacías).
     game.scoringTemplate.categories.forEach(c => {
       if (!seen.has(c.id) && !isExcluded(c)) {
         seen.add(c.id);
@@ -87,13 +77,12 @@ function DuelPadScorepad({
       }
     });
     return out;
-  }, [game, defaults, catsById]);
+  }, [game, defaults]);
 
   const headerStyle = getDuelPadRowStyle('wonder_header');
 
   return (
     <div className="glass-card overflow-hidden">
-      {/* Fila de cabecera con los nombres de los jugadores */}
       <div
         className="grid items-stretch border-b-2 border-black/40"
         style={{
@@ -103,7 +92,7 @@ function DuelPadScorepad({
         }}
       >
         <div className="flex items-center justify-center py-3 px-2">
-          <Landmark className="h-5 w-5 mr-1" />
+          <Award className="h-5 w-5 mr-1" />
           <span className="text-xs font-bold uppercase tracking-wider">
             {game.name}
           </span>
@@ -119,11 +108,9 @@ function DuelPadScorepad({
         ))}
       </div>
 
-      {/* Filas de categorías */}
       {orderedCats.map(cat => {
         const meta = cat.metadata;
         if (!meta || !isDuelPadCategoryKind(meta)) {
-          // Categoría personalizada: render genérico pero conservando el row layout
           return (
             <div
               key={cat.id}
@@ -194,7 +181,6 @@ function DuelPadScorepad({
                 <div
                   key={p.id}
                   className="border-l border-black/10 flex items-center justify-center py-1.5 px-1"
-                  style={{ backgroundColor: isDark ? style.bg : style.bg }}
                 >
                   <input
                     type="number"
@@ -202,7 +188,7 @@ function DuelPadScorepad({
                     value={val ?? ''}
                     onChange={e => onScoreChange(p.id, cat.id, parseInt(e.target.value) || 0)}
                     className={cn(
-                      'text-center text-sm py-1.5 w-full bg-transparent border border-black/15 rounded tabular-nums',
+                      'text-center text-sm py-1.5 w-full bg-transparent border border-black/15 rounded-lg tabular-nums',
                       'focus:outline-none focus:ring-1 focus:ring-black/30 focus:bg-white/40',
                       isDark && 'text-white placeholder-white/60 border-white/30 focus:bg-white/10'
                     )}
@@ -218,9 +204,7 @@ function DuelPadScorepad({
   );
 }
 
-/** Bloque de supremacías tipo 7 Wonders Duel: tres checkbox-cards que
- *  sustituyen tanto la sección "Victoria especial" como la de "Ganador".
- *  Al marcar una supremacía se muestra el selector del jugador ganador. */
+/** Bloque de supremacías 7WD. */
 function DuelSupremacyPicker({
   selectedPlayers,
   specialVictories,
@@ -237,14 +221,11 @@ function DuelSupremacyPicker({
   const winnerBySupremacy = (supType: string): string | undefined =>
     Object.entries(specialVictories).find(([, v]) => v === supType)?.[0];
 
-  // La supremacía activa es aquella que tiene un ganador asignado. Se permite
-  // activar visualmente sin ganador para mostrar la sección de selección.
   const activeSupType = Object.values(specialVictories)[0] as string | undefined;
 
   const toggleSupremacy = (supType: string) => {
     const currentWinner = winnerBySupremacy(supType);
     if (currentWinner) {
-      // Desactivar: limpiamos la supremacía activa y el winnerId si apuntaba aquí.
       setSpecialVictories(prev => {
         const next = { ...prev };
         delete next[currentWinner];
@@ -252,15 +233,10 @@ function DuelSupremacyPicker({
       });
       setWinnerId(prev => (prev === currentWinner ? '' : prev));
     } else {
-      // Activar visualmente: limpiamos cualquier supremacía previa y marcamos
-      // esta como activa usando un "pending" interno basado en el primer jugador
-      // seleccionado para mostrar el winner; si no hay, queda pendiente de pick.
       setSpecialVictories(() => {
         const next: Record<string, string> = {};
         if (selectedPlayers.length > 0) {
-          // Reusamos el primer jugador como placeholder para activar el flag visual.
           next[selectedPlayers[0].id] = supType;
-          // Lo movemos a winnerId para que determineWinner lo detecte.
         }
         return next;
       });
@@ -273,7 +249,6 @@ function DuelSupremacyPicker({
   const pickWinner = (supType: string, playerId: string) => {
     setSpecialVictories(prev => {
       const next: Record<string, string> = {};
-      // Eliminar cualquier supremacía que tuviera este jugador o este tipo.
       for (const [pid, v] of Object.entries(prev)) {
         if (pid !== playerId && v !== supType) next[pid] = v;
       }
@@ -303,8 +278,8 @@ function DuelSupremacyPicker({
             <div
               key={sup.type}
               className={cn(
-                'rounded-xl border-2 transition-all overflow-hidden',
-                isActive ? 'border-foreground/40 shadow-sm' : 'border-border'
+                'rounded-2xl border-2 transition-all overflow-hidden',
+                isActive ? 'border-foreground/30 shadow-sm' : 'border-border'
               )}
             >
               <button
@@ -318,11 +293,11 @@ function DuelSupremacyPicker({
               >
                 <span
                   className={cn(
-                    'w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all',
+                    'w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
                     isActive ? 'bg-white border-white' : 'bg-transparent border-muted-foreground/50'
                   )}
                 >
-                  {isActive && <Check className="h-4 w-4" style={{ color: style.bg }} />}
+                  {isActive && <Check className="h-3.5 w-3.5" style={{ color: style.bg }} />}
                 </span>
                 <span
                   className="inline-flex items-center justify-center shrink-0 rounded"
@@ -376,9 +351,9 @@ function DuelSupremacyPicker({
 }
 
 export default function PlaySession() {
-  const { games, players, addMatch, setTab } = useStore();
-  const [step, setStep] = useState<PlayStep>('selectGame');
-  const [selectedGameId, setSelectedGameId] = useState('');
+  const { games, players, addMatch, setTab, selectedGameId: preSelectedGameId } = useStore();
+  const [step, setStep] = useState<PlayStep>(preSelectedGameId ? 'selectPlayers' : 'selectGame');
+  const [selectedGameId, setSelectedGameId] = useState(preSelectedGameId || '');
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [activeExpansionIds, setActiveExpansionIds] = useState<string[]>([]);
   const [firstPlayerId, setFirstPlayerId] = useState('');
@@ -463,7 +438,6 @@ export default function PlaySession() {
   const getPlayerTotal = (playerId: string): number => {
     const scores = playerScores[playerId] || {};
     return allCategories.reduce((sum, cat) => {
-      // El 'wonder_total' es una fila calculada, no se suma a sí misma.
       if (cat.metadata === 'wonder_total') return sum;
       return sum + (scores[cat.id] || 0);
     }, 0);
@@ -523,7 +497,7 @@ export default function PlaySession() {
         <StepHeader title="¿A qué jugamos?" subtitle="Elige un juego de tu ludoteca" />
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <input value={gameSearch} onChange={e => setGameSearch(e.target.value)} placeholder="Buscar juego..."
             className="input-field pl-10" />
           {gameSearch && (
@@ -532,7 +506,6 @@ export default function PlaySession() {
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Ordenar:</span>
           <button onClick={() => setSortBy('favorites')}
             className={`chip whitespace-nowrap ${sortBy === 'favorites' ? 'chip-active' : ''}`}>♡ Favoritos</button>
           <button onClick={() => setSortBy('name-asc')}
@@ -548,28 +521,24 @@ export default function PlaySession() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {sortedBaseGames.map(game => {
             return (
               <button key={game.id} onClick={() => { setSelectedGameId(game.id); setStep('selectPlayers'); }}
-                className="glass-card overflow-hidden text-left hover:border-foreground/30 transition-colors group animate-slide-up relative">
-                <div className={`h-28 relative overflow-hidden ${typeGradient(game.types[0])}`}>
+                className="text-left animate-slide-up group">
+                <div className={`aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-zinc-100 to-zinc-200 ${typeGradient(game.types[0])}`}>
                   {game.imageUrl ? (
                     <img src={game.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
-                    <GameCover game={game} className="group-hover:scale-105 transition-transform duration-500" />
-                  )}
-                  {game.isFavorite && (
-                    <span className="absolute top-2 right-2 w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs backdrop-blur-sm">♥</span>
+                    <GameCover game={game} className="group-hover:scale-105 transition-transform duration-500 rounded-2xl" />
                   )}
                 </div>
-                <div className="p-3">
-                  <h3 className="text-foreground text-sm font-bold leading-tight line-clamp-2">{game.name}</h3>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {game.types.slice(0, 2).map(t => (
-                      <span key={t} className="text-[9px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">{t}</span>
-                    ))}
+                <div className="pt-2 px-1">
+                  <h3 className="text-foreground text-sm font-bold leading-tight truncate">{game.name}</h3>
+                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+                    {game.types[0] && <span className="truncate">{game.types[0]}</span>}
+                    {game.duration && <><span>·</span><span>{game.duration}'</span></>}
                   </div>
                 </div>
               </button>
@@ -593,19 +562,18 @@ export default function PlaySession() {
       <div className="space-y-4">
         <StepHeader title="Jugadores" subtitle="Selecciona quién juega" onBack={() => setStep('selectGame')} />
 
+        {/* Cabecera estilo "now playing" del juego */}
         <div className="glass-card p-3 flex items-center gap-3">
-          {selectedGame?.imageUrl ? (
-            <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0">
+          <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gradient-to-br from-zinc-100 to-zinc-200">
+            {selectedGame?.imageUrl ? (
               <img src={selectedGame.imageUrl} alt="" className="w-full h-full object-cover" />
-            </div>
-          ) : (
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${typeGradient(selectedGame?.types[0] || '')}`}>
-              <span className="text-xl">{GAME_EMOJIS[selectedGame?.types[0] || ''] || '🎲'}</span>
-            </div>
-          )}
-          <div>
-            <p className="text-sm text-foreground font-bold">{selectedGame?.name}</p>
-            <p className="text-xs text-muted-foreground">{selectedGame?.types.join(' • ')}</p>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-2xl">{GAME_EMOJIS[selectedGame?.types[0] || ''] || '🎲'}</div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold">Jugando a</p>
+            <p className="text-sm font-bold text-foreground truncate">{selectedGame?.name}</p>
           </div>
         </div>
 
@@ -614,14 +582,14 @@ export default function PlaySession() {
             const sel = selectedPlayerIds.includes(player.id);
             return (
               <button key={player.id} onClick={() => togglePlayer(player.id)}
-                className={cn('w-full flex items-center gap-3 p-3.5 rounded-xl transition-all border', sel ? 'bg-secondary border-foreground/30 ring-1 ring-foreground/15' : 'bg-card border-border hover:bg-secondary')}>
+                className={cn('w-full flex items-center gap-3 p-3 rounded-2xl transition-all border', sel ? 'bg-secondary border-foreground/30 ring-1 ring-foreground/15' : 'bg-card border-border hover:bg-secondary')}>
                 <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold"
                   style={{ backgroundColor: player.color }}>
                   {player.name.charAt(0).toUpperCase()}
                 </div>
                 <span className="text-foreground font-semibold flex-1 text-left">{player.name}</span>
                 {sel && (
-                  <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center"><Check className="h-3.5 w-3.5" /></span>
+                  <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center"><Check className="h-4 w-4" /></span>
                 )}
               </button>
             );
@@ -663,8 +631,8 @@ export default function PlaySession() {
                 const on = activeExpansionIds.includes(exp.id);
                 return (
                   <button key={exp.id} onClick={() => toggleExpansion(exp.id)}
-                    className={cn('w-full flex items-center gap-3 p-3 rounded-xl transition-all border', on ? 'bg-secondary border-foreground/30' : 'bg-card border-border hover:bg-secondary')}>
-                    <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center transition-all', on ? 'bg-primary border-primary' : 'border-input')}>
+                    className={cn('w-full flex items-center gap-3 p-3 rounded-2xl transition-all border', on ? 'bg-secondary border-foreground/30' : 'bg-card border-border hover:bg-secondary')}>
+                    <div className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all', on ? 'bg-primary border-primary' : 'border-input')}>
                       {on && <Check className="h-3 w-3 text-primary-foreground" />}
                     </div>
                     <span className="text-sm text-foreground font-medium">{exp.name}</span>
@@ -725,25 +693,23 @@ export default function PlaySession() {
 
         <div className="glass-card p-3 flex items-center gap-3">
           {selectedGame?.imageUrl ? (
-            <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0">
               <img src={selectedGame.imageUrl} alt="" className="w-full h-full object-cover" />
             </div>
           ) : null}
-          <div>
-            <span className="text-sm text-foreground font-bold">{selectedGame?.name}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold">Partida en curso</p>
+            <span className="text-sm font-bold text-foreground truncate">{selectedGame?.name}</span>
             {activeExpansionIds.length > 0 && (
-              <span className="text-xs text-muted-foreground block">
+              <span className="text-xs text-muted-foreground block truncate">
                 + {activeExpansionIds.map(id => games.find(g => g.id === id)?.name).join(', ')}
               </span>
             )}
           </div>
         </div>
 
-        {/* En modo Duel Pad la sección "Victoria especial" se sustituye por el
-            bloque de supremacías de la parte inferior. Para el resto de juegos
-            se mantiene la lógica clásica. */}
         {!useDuelPad && hasSpecialVictory && allSpecialVictoryTypes.length > 0 && (
-          <div className="glass-card p-4 border-amber-200 bg-amber-50">
+          <div className="glass-card p-4 border-amber-200">
             <h3 className="text-amber-700 font-bold text-sm mb-2 flex items-center gap-2">⚡ Victoria especial</h3>
             <p className="text-xs text-muted-foreground mb-3">Si alguien ganó por una condición especial, selecciónalo. No será necesario introducir puntos.</p>
             {selectedPlayers.map(player => (

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Crown, Pencil, Trash2, Save, X, Target, ScrollText, Spade, Landmark } from 'lucide-react';
+import { Crown, Pencil, Trash2, Save, X, Target, ScrollText, Spade, ArrowLeft } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useRemigioStore } from '../store/useRemigioStore';
-import { getBalance, statusLabel } from '../remigio/engine';
+import { statusLabel } from '../remigio/engine';
 import { cn } from '../utils/cn';
 import { Game, Player } from '../types';
 import {
@@ -14,12 +14,6 @@ import {
   isDuelPadCategoryKind,
   supremacyMetaFor,
 } from '../utils/duelPad';
-
-const GAME_EMOJIS: Record<string, string> = {
-  'Estrategia': '♟️', 'Cartas': '🃏', 'Filler': '⚡', 'Cooperativo': '🤝',
-  'Dados': '🎲', 'Puzzle': '🧩', 'Construcción': '🏗️', 'Negociación': '🤝',
-  'Destreza': '🎯', 'Familiar': '👨‍👩‍👧‍👦', 'Abstracto': '🔷', 'Duel': '⚔️',
-};
 
 type Entry =
   | { kind: 'match'; date: string; id: string }
@@ -33,21 +27,16 @@ export default function History() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editingScores, setEditingScores] = useState<Record<string, Record<string, number>> | null>(null);
   const [filterGameId, setFilterGameId] = useState('');
-  const [filterExpansionId, setFilterExpansionId] = useState('');
 
   const baseGames = games.filter(g => !g.isExpansion);
   const sortedMatches = [...matches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const filteredMatches = sortedMatches.filter(m => {
     if (filterGameId && m.gameId !== filterGameId && filterGameId !== 'remigio') return false;
-    if (filterGameId === 'remigio') return false; // solo Remigio: ocultar matches normales
-    if (filterExpansionId && !m.activeExpansionIds.includes(filterExpansionId)) return false;
+    if (filterGameId === 'remigio') return false;
     return true;
   });
 
-  const filterExpansions = filterGameId && filterGameId !== 'remigio' ? games.filter(g => g.baseGameId === filterGameId) : [];
-
-  // Línea de tiempo unificada: partidas normales + partidas de Remigio.
   const showRemigio = filterGameId === '' || filterGameId === 'remigio';
   const entries: Entry[] = [
     ...filteredMatches.map(m => ({ kind: 'match' as const, date: m.date, id: m.id })),
@@ -61,7 +50,7 @@ export default function History() {
 
   const formatDate = (d: string) => {
     const date = new Date(d);
-    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
   const startEdit = () => {
@@ -102,64 +91,46 @@ export default function History() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">Historial</h2>
-        <p className="text-sm text-muted-foreground">{matches.length + remigioSessions.length} partidas registradas</p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Historial</h2>
+          <p className="text-sm text-muted-foreground">{matches.length + remigioSessions.length} partidas registradas</p>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2">
-        <select value={filterGameId} onChange={e => { setFilterGameId(e.target.value); setFilterExpansionId(''); }}
-          className="input-field flex-1">
-          <option value="">Todos los juegos</option>
-          <option value="remigio">🃏 Remigio</option>
-          {baseGames.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-        </select>
-        {filterExpansions.length > 0 && (
-          <select value={filterExpansionId} onChange={e => setFilterExpansionId(e.target.value)}
-            className="input-field">
-            <option value="">Cualquier config</option>
-            {filterExpansions.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
-        )}
+      {/* Filter chips estilo reproductor */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <button onClick={() => setFilterGameId('')} className={`chip whitespace-nowrap ${!filterGameId ? 'chip-active' : ''}`}>Todas</button>
+        <button onClick={() => setFilterGameId('remigio')} className={`chip whitespace-nowrap ${filterGameId === 'remigio' ? 'chip-active' : ''}`}>🃏 Remigio</button>
+        {baseGames.map(g => (
+          <button key={g.id} onClick={() => setFilterGameId(g.id)}
+            className={`chip whitespace-nowrap ${filterGameId === g.id ? 'chip-active' : ''}`}>
+            {g.name}
+          </button>
+        ))}
       </div>
 
-      {/* Unified timeline: matches + Remigio */}
-      <div className="space-y-3">
-        {entries.map(entry => {
+      {/* Track-list: cada partida como una "canción" con índice y duración */}
+      <div className="glass-card overflow-hidden divide-y divide-border">
+        {entries.map((entry, idx) => {
           if (entry.kind === 'remigio') {
             const session = remigioSessions.find(s => s.id === entry.id);
             if (!session) return null;
             const winner = session.players.find(p => p.id === session.winner_id);
             return (
               <button key={`r-${session.id}`} onClick={() => openRemigio(session.id)}
-                className="w-full glass-card p-4 text-left hover:border-foreground/30 transition-colors animate-slide-up">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-6 h-6 rounded bg-primary text-primary-foreground flex items-center justify-center shrink-0"><Spade className="h-3.5 w-3.5" /></span>
-                    <span className="text-foreground font-bold text-sm truncate">Remigio · {session.name}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground shrink-0">{formatDate(session.created_at)}</span>
+                className="w-full flex items-center gap-3 p-3 text-left hover:bg-secondary/60 transition-colors animate-fade-in">
+                <span className="text-xs font-bold text-muted-foreground w-6 text-center tabular-nums">{String(idx + 1).padStart(2, '0')}</span>
+                <div className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+                  <Spade className="h-5 w-5" />
                 </div>
-                <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <span className="text-[10px] bg-secondary text-muted-foreground px-2 py-0.5 rounded-full border border-border">{statusLabel(session.status)} · {session.rounds.length} rondas</span>
-                  {winner && (
-                    <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1"><Crown className="h-3 w-3" /> {winner.guest_name}</span>
-                  )}
-                  {!session.synced && (
-                    <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 ml-auto">⏳ Sin sincronizar</span>
-                  )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">Remigio · {session.name}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    {statusLabel(session.status)} · {session.rounds.length} rondas {winner ? `· ${winner.guest_name}` : ''}
+                  </p>
                 </div>
-                <div className="flex gap-1.5 flex-wrap">
-                  {session.players.map(p => {
-                    const bal = getBalance(session, p.id);
-                    return (
-                      <span key={p.id} className={cn('text-[10px] px-2 py-1 rounded-full font-semibold border', p.id === session.winner_id ? 'bg-amber-100 text-amber-700 border-amber-200' : 'text-muted-foreground bg-secondary border-border')}>
-                        {p.guest_name}{session.transactions.length > 0 ? `: ${bal > 0 ? '+' : ''}${bal.toFixed(2)}€` : ''}
-                      </span>
-                    );
-                  })}
-                </div>
+                <span className="text-xs text-muted-foreground tabular-nums shrink-0">{formatDate(session.created_at)}</span>
               </button>
             );
           }
@@ -168,43 +139,26 @@ export default function History() {
           if (!match) return null;
           const game = games.find(g => g.id === match.gameId);
           const winner = players.find(p => p.id === match.winnerId);
-          const emoji = GAME_EMOJIS[game?.types[0] || ''] || '🎲';
 
           return (
             <button key={match.id} onClick={() => setDetailId(match.id)}
-              className="w-full glass-card p-4 text-left hover:border-foreground/30 transition-colors animate-slide-up">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-lg">{emoji}</span>
-                  <span className="text-foreground font-bold text-sm truncate">{game?.name || 'Desconocido'}</span>
-                </div>
-                <span className="text-xs text-muted-foreground shrink-0">{formatDate(match.date)}</span>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                {winner && (
-                  <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1"><Crown className="h-3 w-3" /> {winner.name}</span>
-                )}
-                {match.activeExpansionIds.length > 0 && (
-                  <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full border border-border">
-                    +{match.activeExpansionIds.map(id => games.find(g => g.id === id)?.name).join(', ')}
-                  </span>
-                )}
-                {!match.synced && (
-                  <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 ml-auto">⏳ Sin sincronizar</span>
+              className="w-full flex items-center gap-3 p-3 text-left hover:bg-secondary/60 transition-colors animate-fade-in">
+              <span className="text-xs font-bold text-muted-foreground w-6 text-center tabular-nums">{String(idx + 1).padStart(2, '0')}</span>
+              <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-gradient-to-br from-zinc-100 to-zinc-200">
+                {game?.imageUrl ? (
+                  <img src={game.imageUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-400">🎲</div>
                 )}
               </div>
-              <div className="flex gap-1.5 flex-wrap">
-                {match.playerIds.map(pid => {
-                  const p = players.find(pl => pl.id === pid);
-                  const score = match.playerScores.find(ps => ps.playerId === pid);
-                  return p ? (
-                    <span key={pid} className={cn('text-[10px] px-2 py-1 rounded-full font-semibold border', pid === match.winnerId ? 'text-white border-transparent' : 'text-muted-foreground bg-secondary border-border')}
-                      style={pid === match.winnerId ? { backgroundColor: p.color } : {}}>
-                      {p.name}: {score?.specialVictory || score?.total}
-                    </span>
-                  ) : null;
-                })}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{game?.name || 'Desconocido'}</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {winner ? `${winner.name} · ` : ''}{match.playerIds.length} jugadores
+                  {match.activeExpansionIds.length > 0 ? ` · +${match.activeExpansionIds.length}` : ''}
+                </p>
               </div>
+              <span className="text-xs text-muted-foreground tabular-nums shrink-0">{formatDate(match.date)}</span>
             </button>
           );
         })}
@@ -221,21 +175,30 @@ export default function History() {
       {detailMatch && detailGame && (
         <div className="modal-overlay" onClick={() => { setDetailId(null); setEditingScores(null); }}>
           <div className="modal-panel p-5" onClick={e => e.stopPropagation()}>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-bold text-foreground">{detailGame.name}</h2>
-                <p className="text-sm text-muted-foreground">{formatDate(detailMatch.date)}</p>
-                {detailMatch.activeExpansionIds.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    + {detailMatch.activeExpansionIds.map(id => games.find(g => g.id === id)?.name).join(', ')}
-                  </p>
-                )}
+            <div className="flex items-center justify-between mb-4">
+              <button onClick={() => { setDetailId(null); setEditingScores(null); }}
+                className="w-9 h-9 rounded-full bg-card border border-border flex items-center justify-center text-foreground">
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div className="text-center leading-tight">
+                <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold">Partida</p>
+                <p className="text-sm font-bold text-foreground">{detailGame.name}</p>
               </div>
-              <button onClick={() => { setDetailId(null); setEditingScores(null); }} className="w-8 h-8 rounded-full bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"><X className="h-4 w-4" /></button>
+              <button onClick={() => { setDetailId(null); setEditingScores(null); }}
+                className="w-9 h-9 rounded-full bg-card border border-border text-foreground flex items-center justify-center">
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
+            <p className="text-xs text-muted-foreground mb-1 text-center">{formatDate(detailMatch.date)}</p>
+            {detailMatch.activeExpansionIds.length > 0 && (
+              <p className="text-xs text-muted-foreground mb-2 text-center">
+                + {detailMatch.activeExpansionIds.map(id => games.find(g => g.id === id)?.name).join(', ')}
+              </p>
+            )}
+
             {detailMatch.firstPlayerId && (
-              <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
+              <p className="text-xs text-muted-foreground mb-3 flex items-center justify-center gap-1">
                 <Target className="h-3.5 w-3.5" /> Primer turno: <span className="text-foreground font-semibold">{players.find(p => p.id === detailMatch.firstPlayerId)?.name}</span>
               </p>
             )}
@@ -266,7 +229,7 @@ export default function History() {
                     });
 
                     return (
-                      <div key={ps.playerId} className={cn('rounded-xl p-3 border', ps.playerId === detailMatch.winnerId ? 'bg-amber-50 border-amber-200' : 'bg-secondary border-border')}>
+                      <div key={ps.playerId} className={cn('rounded-2xl p-3 border', ps.playerId === detailMatch.winnerId ? 'bg-amber-50 border-amber-200' : 'bg-secondary border-border')}>
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-lg">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}</span>
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
@@ -330,7 +293,6 @@ export default function History() {
   );
 }
 
-/** Bloque compacto con la supremacía que decidió la partida (modo Duel Pad). */
 function DuelSupremacySummary({
   match,
   allPlayers,
@@ -346,7 +308,7 @@ function DuelSupremacySummary({
   if (!winner || !style) return null;
 
   return (
-    <div className="mt-3 mb-4 rounded-xl border border-border overflow-hidden">
+    <div className="mt-3 mb-4 rounded-2xl border border-border overflow-hidden">
       <div
         className="flex items-center gap-3 px-3 py-2.5 text-white"
         style={{ backgroundColor: style.bg }}
@@ -368,14 +330,12 @@ function DuelSupremacySummary({
   );
 }
 
-/** Detecta si un match debe mostrarse con el scorepad Duel. */
 function isDuelPadMatch(game: Game): boolean {
   if (game.scoringTemplate.layout === 'duel-pad') return true;
   if (/7\s*wonders\s*duel/i.test(game.name)) return true;
   return false;
 }
 
-/** Scorepad estilo 7 Wonders Duel en modo lectura (también editable). */
 function DuelPadReadonly({
   game,
   detailMatch,
@@ -421,7 +381,7 @@ function DuelPadReadonly({
   const headerStyle = getDuelPadRowStyle('wonder_header');
 
   return (
-    <div className="overflow-hidden rounded-xl border border-black/20 mb-4">
+    <div className="overflow-hidden rounded-2xl border border-black/20 mb-4">
       <div
         className="grid items-stretch border-b-2 border-black/40"
         style={{
@@ -431,7 +391,6 @@ function DuelPadReadonly({
         }}
       >
         <div className="flex items-center justify-center py-3 px-2">
-          <Landmark className="h-5 w-5 mr-1" />
           <span className="text-xs font-bold uppercase tracking-wider">{game.name}</span>
         </div>
         {matchPlayers.map(ps => (

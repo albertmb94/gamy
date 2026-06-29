@@ -67,8 +67,6 @@ export default function Stats() {
     }).sort((a, b) => b.wins - a.wins || b.winRate - a.winRate);
   }, [players, filteredMatches]);
 
-  // Ranking de Remigio: agregado por nombre de jugador (invitado) a lo largo
-  // de todas las partidas. Lo relevante aquí es el balance económico.
   const remigioRanking = useMemo(() => {
     const byName = new Map<string, { name: string; partidas: number; wins: number; rounds: number; balance: number }>();
     for (const s of remigioSessions) {
@@ -86,30 +84,29 @@ export default function Stats() {
     return [...byName.values()].sort((a, b) => b.balance - a.balance || b.wins - a.wins);
   }, [remigioSessions]);
 
+  const TABS: { key: StatsView; label: string }[] = [
+    { key: 'global', label: 'Global' },
+    { key: 'game', label: 'Juego' },
+    { key: 'type', label: 'Tipo' },
+    { key: 'remigio', label: 'Remigio' },
+    { key: 'achievements', label: 'Logros' },
+  ];
+
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">Estadísticas</h2>
+        <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Estadísticas</h2>
         <p className="text-sm text-muted-foreground">Rankings, logros y más</p>
       </div>
 
-      <div className="glass-card p-1">
-        <div className="flex gap-1">
-          {[
-            { key: 'global', label: '🌍 Global' },
-            { key: 'game', label: '🎲 Juego' },
-            { key: 'type', label: '🏷️ Tipo' },
-            { key: 'remigio', label: '🃏 Remigio' },
-            { key: 'achievements', label: '🏆 Logros' },
-          ].map(({ key, label }) => (
-            <button key={key} onClick={() => { setView(key as StatsView); setFilterGameId(''); setFilterType(''); setFilterExpansionId(''); }}
-              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                view === key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-              }`}>
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* Tabs estilo pill */}
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {TABS.map(({ key, label }) => (
+          <button key={key} onClick={() => { setView(key); setFilterGameId(''); setFilterType(''); setFilterExpansionId(''); }}
+            className={`chip whitespace-nowrap ${view === key ? 'chip-active' : ''}`}>
+            {label}
+          </button>
+        ))}
       </div>
 
       {view === 'game' && (
@@ -153,49 +150,51 @@ export default function Stats() {
             </div>
           ) : (
             rankings.map((r, idx) => (
-              <div key={r.player.id} className={`glass-card p-4 ${idx === 0 && r.wins > 0 ? 'ring-1 ring-amber-400/50' : ''}`}>
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-lg w-7 text-center">
+              <div key={r.player.id} className={`glass-card overflow-hidden ${idx === 0 && r.wins > 0 ? 'ring-1 ring-amber-400/50' : ''}`}>
+                <div className="flex items-center gap-3 p-3">
+                  <span className="text-xs font-bold text-muted-foreground w-6 text-center tabular-nums">
                     {idx === 0 && r.wins > 0 ? '🥇' : idx === 1 && r.wins > 0 ? '🥈' : idx === 2 && r.wins > 0 ? '🥉' : `#${idx + 1}`}
                   </span>
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold shrink-0"
                     style={{ backgroundColor: r.player.color }}>
                     {r.player.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-foreground font-bold text-sm truncate">{r.player.name}</h4>
-                    <p className="text-xs text-muted-foreground">{r.total} partidas</p>
+                    {r.total > 0 ? (
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${r.winRate}%`, backgroundColor: r.player.color }} />
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-0.5">Sin partidas</p>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <p className="text-foreground font-black text-lg">{r.wins}<span className="text-xs font-medium text-muted-foreground">W</span></p>
-                    <p className="text-xs text-muted-foreground font-semibold">{r.winRate.toFixed(0)}%</p>
+                  <div className="text-right shrink-0">
+                    <p className="text-foreground font-black text-lg tabular-nums leading-none">{r.wins}<span className="text-[10px] font-medium text-muted-foreground ml-0.5">W</span></p>
+                    <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">{r.winRate.toFixed(0)}%</p>
                   </div>
                 </div>
 
                 {r.total > 0 && (
-                  <div className="h-2.5 bg-muted rounded-full overflow-hidden mb-3">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${r.winRate}%`, backgroundColor: r.player.color }} />
+                  <div className="grid grid-cols-4 border-t border-border divide-x divide-border">
+                    <div className="text-center py-2">
+                      <p className="text-[10px] text-muted-foreground">Partidas</p>
+                      <p className="text-xs text-foreground font-bold tabular-nums">{r.total}</p>
+                    </div>
+                    <div className="text-center py-2">
+                      <p className="text-[10px] text-muted-foreground">Derrotas</p>
+                      <p className="text-xs text-foreground font-bold tabular-nums">{r.losses}</p>
+                    </div>
+                    <div className="text-center py-2">
+                      <p className="text-[10px] text-muted-foreground">Pts/Part.</p>
+                      <p className="text-xs text-foreground font-bold tabular-nums">{r.avgPoints.toFixed(1)}</p>
+                    </div>
+                    <div className="text-center py-2">
+                      <p className="text-[10px] text-muted-foreground">Racha</p>
+                      <p className="text-xs text-amber-600 font-bold tabular-nums">{r.bestStreak}🔥</p>
+                    </div>
                   </div>
                 )}
-
-                <div className="grid grid-cols-4 gap-2 text-center">
-                  <div className="bg-secondary rounded-lg py-1.5">
-                    <p className="text-[10px] text-muted-foreground">Victorias</p>
-                    <p className="text-xs text-green-600 font-bold">{r.wins}</p>
-                  </div>
-                  <div className="bg-secondary rounded-lg py-1.5">
-                    <p className="text-[10px] text-muted-foreground">Derrotas</p>
-                    <p className="text-xs text-red-600 font-bold">{r.losses}</p>
-                  </div>
-                  <div className="bg-secondary rounded-lg py-1.5">
-                    <p className="text-[10px] text-muted-foreground">Pts/Partida</p>
-                    <p className="text-xs text-foreground font-bold">{r.avgPoints.toFixed(1)}</p>
-                  </div>
-                  <div className="bg-secondary rounded-lg py-1.5">
-                    <p className="text-[10px] text-muted-foreground">Racha</p>
-                    <p className="text-xs text-amber-600 font-bold">{r.bestStreak}🔥</p>
-                  </div>
-                </div>
               </div>
             ))
           )}
@@ -215,37 +214,37 @@ export default function Stats() {
             </div>
           ) : (
             remigioRanking.map((r, idx) => (
-              <div key={r.name} className={`glass-card p-4 ${idx === 0 && r.balance > 0 ? 'ring-1 ring-amber-400/50' : ''}`}>
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-lg w-7 text-center">
+              <div key={r.name} className={`glass-card overflow-hidden ${idx === 0 && r.balance > 0 ? 'ring-1 ring-amber-400/50' : ''}`}>
+                <div className="flex items-center gap-3 p-3">
+                  <span className="text-xs font-bold text-muted-foreground w-6 text-center tabular-nums">
                     {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
                   </span>
-                  <div className="w-10 h-10 rounded-full bg-secondary text-foreground flex items-center justify-center font-bold border border-border">
+                  <div className="w-12 h-12 rounded-full bg-secondary text-foreground flex items-center justify-center font-bold border border-border">
                     {r.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-foreground font-bold text-sm truncate">{r.name}</h4>
-                    <p className="text-xs text-muted-foreground">{r.partidas} partidas · {r.wins} ganadas</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{r.partidas} partidas · {r.wins} ganadas</p>
                   </div>
-                  <div className="text-right">
-                    <p className={`font-black text-lg tabular-nums ${r.balance > 0 ? 'text-green-600' : r.balance < 0 ? 'text-red-600' : 'text-foreground'}`}>
+                  <div className="text-right shrink-0">
+                    <p className={`font-black text-lg tabular-nums leading-none ${r.balance > 0 ? 'text-green-600' : r.balance < 0 ? 'text-red-600' : 'text-foreground'}`}>
                       {r.balance > 0 ? '+' : ''}{r.balance.toFixed(2)}€
                     </p>
-                    <p className="text-xs text-muted-foreground font-semibold">balance</p>
+                    <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">balance</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-secondary rounded-lg py-1.5">
+                <div className="grid grid-cols-3 border-t border-border divide-x divide-border">
+                  <div className="text-center py-2">
                     <p className="text-[10px] text-muted-foreground">Partidas</p>
-                    <p className="text-xs text-foreground font-bold">{r.partidas}</p>
+                    <p className="text-xs text-foreground font-bold tabular-nums">{r.partidas}</p>
                   </div>
-                  <div className="bg-secondary rounded-lg py-1.5">
+                  <div className="text-center py-2">
                     <p className="text-[10px] text-muted-foreground">Victorias</p>
-                    <p className="text-xs text-green-600 font-bold">{r.wins}</p>
+                    <p className="text-xs text-green-600 font-bold tabular-nums">{r.wins}</p>
                   </div>
-                  <div className="bg-secondary rounded-lg py-1.5">
-                    <p className="text-[10px] text-muted-foreground">Rondas ganadas</p>
-                    <p className="text-xs text-foreground font-bold">{r.rounds}</p>
+                  <div className="text-center py-2">
+                    <p className="text-[10px] text-muted-foreground">Rondas</p>
+                    <p className="text-xs text-foreground font-bold tabular-nums">{r.rounds}</p>
                   </div>
                 </div>
               </div>

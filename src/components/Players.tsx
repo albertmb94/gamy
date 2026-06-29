@@ -25,19 +25,29 @@ export default function Players() {
     setSelectedColor(COLORS[(players.length + 1) % COLORS.length]);
   };
 
+  // Ordenar jugadores por victorias para una vista tipo "ranking"
+  const sortedPlayers = [...players].sort((a, b) => {
+    const aWins = matches.filter(m => m.winnerId === a.id).length;
+    const bWins = matches.filter(m => m.winnerId === b.id).length;
+    return bWins - aWins;
+  });
+
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">Jugadores</h2>
+        <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Jugadores</h2>
         <p className="text-sm text-muted-foreground">{players.length} registrados</p>
       </div>
 
+      {/* Add player — card estilo "Add to library" */}
       <div className="glass-card p-4 space-y-4">
         <div className="flex gap-2">
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nombre del jugador"
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
             className="input-field flex-1" />
-          <button onClick={handleAdd} className="btn btn-primary px-5"><Plus className="h-4 w-4" /></button>
+          <button onClick={handleAdd} className="btn btn-primary px-5">
+            <Plus className="h-4 w-4" />
+          </button>
         </div>
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Color</p>
@@ -51,66 +61,56 @@ export default function Players() {
         </div>
       </div>
 
-      <div className="space-y-3">
-        {players.map(player => {
+      {/* Lista de jugadores — estilo track-list */}
+      <div className="glass-card overflow-hidden divide-y divide-border">
+        {sortedPlayers.map((player, idx) => {
           const playerMatches = matches.filter(m => m.playerIds.includes(player.id));
           const wins = playerMatches.filter(m => m.winnerId === player.id).length;
           const pAchievements = playerAchievements.filter(a => a.playerId === player.id);
           const winRate = playerMatches.length > 0 ? Math.round((wins / playerMatches.length) * 100) : 0;
 
           return (
-            <div key={player.id} className="glass-card p-4 animate-slide-up">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl shrink-0"
-                  style={{ backgroundColor: player.color }}>
-                  {player.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  {editId === player.id ? (
-                    <div className="flex gap-2">
-                      <input value={editName} onChange={e => setEditName(e.target.value)}
-                        className="input-field flex-1 text-sm py-1.5"
-                        autoFocus onKeyDown={e => { if (e.key === 'Enter') { updatePlayer(player.id, { name: editName }); setEditId(null); } }} />
-                      <button onClick={() => { updatePlayer(player.id, { name: editName }); setEditId(null); }}
-                        className="btn btn-success px-3 py-1.5"><Check className="h-4 w-4" /></button>
-                    </div>
-                  ) : (
-                    <h3 className="text-foreground font-bold truncate">{player.name}</h3>
-                  )}
-                  <div className="flex gap-3 text-xs text-muted-foreground mt-1 font-medium">
-                    <span>{playerMatches.length} partidas</span>
-                    <span className="text-green-600">{wins} victorias</span>
-                    <span>{winRate}%</span>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={() => { setEditId(player.id); setEditName(player.name); }}
-                    className="text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-secondary transition-colors"><Pencil className="h-4 w-4" /></button>
-                  <button onClick={() => { if (confirm(`¿Eliminar a ${player.name}?`)) deletePlayer(player.id); }}
-                    className="text-muted-foreground hover:text-destructive p-2 rounded-lg hover:bg-secondary transition-colors"><Trash2 className="h-4 w-4" /></button>
-                </div>
+            <div key={player.id} className="flex items-center gap-3 p-3 animate-fade-in">
+              <span className="text-xs font-bold text-muted-foreground w-6 text-center tabular-nums">{String(idx + 1).padStart(2, '0')}</span>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base shrink-0"
+                style={{ backgroundColor: player.color }}>
+                {player.name.charAt(0).toUpperCase()}
               </div>
-
-              {playerMatches.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-border">
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div className="flex-1 min-w-0">
+                {editId === player.id ? (
+                  <div className="flex gap-2">
+                    <input value={editName} onChange={e => setEditName(e.target.value)}
+                      className="input-field flex-1 text-sm py-1.5"
+                      autoFocus onKeyDown={e => { if (e.key === 'Enter') { updatePlayer(player.id, { name: editName }); setEditId(null); } }} />
+                    <button onClick={() => { updatePlayer(player.id, { name: editName }); setEditId(null); }}
+                      className="btn btn-success px-3 py-1.5"><Check className="h-4 w-4" /></button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-foreground truncate">{player.name}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {playerMatches.length} partidas · {wins} victorias · {winRate}%
+                    </p>
+                  </>
+                )}
+                {playerMatches.length > 0 && (
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1.5">
                     <div className="h-full rounded-full transition-all" style={{ width: `${winRate}%`, backgroundColor: player.color }} />
                   </div>
-                </div>
-              )}
-
-              {pAchievements.length > 0 && (
-                <div className="flex gap-1.5 mt-3 flex-wrap">
-                  {pAchievements.map(a => {
-                    const info = ACHIEVEMENTS_MAP[a.achievementId];
-                    return info ? (
-                      <span key={a.achievementId} className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg border border-amber-200" title={info.description}>
-                        {info.icon} {info.name}
-                      </span>
-                    ) : null;
-                  })}
-                </div>
-              )}
+                )}
+              </div>
+              <div className="flex gap-1 shrink-0">
+                {pAchievements.slice(0, 2).map(a => {
+                  const info = ACHIEVEMENTS_MAP[a.achievementId];
+                  return info ? <span key={a.achievementId} className="text-base" title={info.name}>{info.icon}</span> : null;
+                })}
+              </div>
+              <div className="flex gap-0.5 shrink-0">
+                <button onClick={() => { setEditId(player.id); setEditName(player.name); }}
+                  className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-secondary transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
+                <button onClick={() => { if (confirm(`¿Eliminar a ${player.name}?`)) deletePlayer(player.id); }}
+                  className="text-muted-foreground hover:text-destructive p-1.5 rounded-full hover:bg-secondary transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
             </div>
           );
         })}
