@@ -20,7 +20,8 @@ export type ScoreCategoryMetadata =
   | 'wonder_recurso'      // Cartas amarillas (materias primas)
   | 'wonder_gremio'       // Cartas moradas (gremios)
   | 'wonder_moneda'       // Monedas/ganancias
-  | 'wonder_derrota'      // Derrota militar (negativo)
+  | 'wonder_derrota'      // Derrota militar (negativo, obsoleto)
+  | 'wonder_militar'      // Puntuación militar (suma de victoria/derrota)
   | 'wonder_progreso'     // Tokens de progreso científico/civil
   | 'wonder_supremacia_militar'    // Token de supremacía militar
   | 'wonder_supremacia_cientifica' // Token de supremacía científica

@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Game, Player, MatchRecord, PlayerAchievement } from '../types';
+import { Game, Player, MatchRecord, PlayerAchievement, ScoreCategory } from '../types';
 import { RemigioSession } from '../remigio/types';
 
 const DB_NAME = 'ludotic-db';
@@ -294,5 +294,64 @@ export async function migrateDuelPadObsoleteCategories(): Promise<void> {
   await tx.done;
   if (changed) {
     console.log('[migrateDuelPadObsoleteCategories] limpieza aplicada');
+  }
+}
+
+/**
+ * Añade la fila "Militar" (wonder_militar) a la plantilla de cualquier juego
+ * 7 Wonders Duel que no la tenga. Se ejecuta una sola vez (marcada con una
+ * bandera en meta). Inserta la categoría entre las monedas y el progreso,
+ * siguiendo el orden canónico de la imagen de referencia. Si el juego ya
+ * tiene la fila, no la duplica: la migración es idempotente.
+ */
+export async function migrateDuelPadMilitar(): Promise<void> {
+  const db = await getDb();
+  const done = await db.get('meta', 'duelPadMigratedMilitar');
+  if (done === true) return;
+
+  const tx = db.transaction(['games', 'meta'], 'readwrite');
+  const store = tx.objectStore('games');
+  const all = (await store.getAll()) as Game[];
+  let changed = false;
+  for (const g of all) {
+    const isDuel =
+      g.scoringTemplate.layout === 'duel-pad' ||
+      /7\s*wonders\s*duel/i.test(g.name);
+    if (!isDuel) continue;
+
+    const cats = g.scoringTemplate.categories;
+    const alreadyHasMilitar = cats.some(c => c.metadata === 'wonder_militar');
+    if (alreadyHasMilitar) continue;
+
+    // Posición: justo después de la categoría "moneda" (la última de tipo
+    // moneda) y antes de "wonder_progreso" si existe. Si no, al final antes
+    // del total.
+    const insertAfterIdx = (() => {
+      const lastMoneda = cats.reduce(
+        (acc, c, i) => (c.metadata === 'moneda' || c.metadata === 'wonder_moneda' ? i : acc),
+        -1,
+      );
+      if (lastMoneda >= 0) return lastMoneda + 1;
+      const lastTotal = cats.findIndex(c => c.metadata === 'wonder_total');
+      return lastTotal >= 0 ? lastTotal : cats.length;
+    })();
+
+    const militarCat: ScoreCategory = {
+      id: 'militar',
+      name: 'Militar',
+      metadata: 'wonder_militar',
+    };
+    const next = [
+      ...cats.slice(0, insertAfterIdx),
+      militarCat,
+      ...cats.slice(insertAfterIdx),
+    ];
+    await store.put({ ...g, scoringTemplate: { ...g.scoringTemplate, categories: next } });
+    changed = true;
+  }
+  await tx.objectStore('meta').put(true, 'duelPadMigratedMilitar');
+  await tx.done;
+  if (changed) {
+    console.log('[migrateDuelPadMilitar] fila Militar añadida');
   }
 }

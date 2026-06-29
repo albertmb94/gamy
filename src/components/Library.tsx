@@ -268,6 +268,7 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
                       <option value="maravilla">7WD · Etapa</option>
                       <option value="wonder_moneda">7WD · Moneda V</option>
                       <option value="wonder_derrota">7WD · Derrota</option>
+                      <option value="wonder_militar">7WD · Militar</option>
                       <option value="wonder_progreso">7WD · Progreso</option>
                       <option value="wonder_supremacia_militar">7WD · Supremacía M.</option>
                       <option value="wonder_supremacia_cientifica">7WD · Supremacía C.</option>

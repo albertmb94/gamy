@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Building2, Hexagon, Pyramid, XCircle, Sigma, Award, Landmark } from 'lucide-react';
+import { Building2, Hexagon, Pyramid, XCircle, Sigma, Award, Landmark, Swords } from 'lucide-react';
 import type { ScoreCategory, ScoreCategoryMetadata } from '../types';
 
 // Tipos de fila del scorepad Duel. Incluyen la cabecera decorativa
@@ -149,6 +149,18 @@ export const DUEL_PAD_ROW_STYLES: Record<DuelPadRowKind, DuelPadRowStyle> = {
       </span>
     ),
   },
+  wonder_militar: {
+    bg: '#FEE2E2',
+    iconBg: '#FECACA',
+    icon: (
+      <span
+        className="relative inline-flex items-center justify-center rounded-full border border-black/30"
+        style={{ width: 26, height: 26, backgroundColor: '#B91C1C' }}
+      >
+        <Swords className="h-4 w-4" style={{ color: '#FFFFFF' }} />
+      </span>
+    ),
+  },
   militar: {
     bg: '#FFE4E6',
     iconBg: '#FFF1F2',
@@ -223,6 +235,7 @@ export const DUEL_PAD_ROW_ORDER: DuelPadRowKind[] = [
   'maravilla',
   'wonder_moneda',
   'moneda',
+  'wonder_militar',
   'wonder_progreso',
   'wonder_total',
 ];
@@ -245,6 +258,7 @@ export function buildDuelPadCategories(): ScoreCategory[] {
     { id: 'etapa', name: 'Etapas', metadata: 'maravilla' },
     { id: 'moneda_v', name: 'F. Progreso', metadata: 'wonder_moneda' },
     { id: 'moneda_a', name: 'Monedas', metadata: 'moneda' },
+    { id: 'militar', name: 'Militar', metadata: 'wonder_militar' },
     { id: 'progreso', name: 'Progreso', metadata: 'wonder_progreso' },
     { id: 'total', name: 'Total', metadata: 'wonder_total' },
   ];
@@ -267,6 +281,7 @@ export const DUEL_PAD_ROW_LABELS: Record<DuelPadRowKind, string> = {
   wonder_moneda: 'F. Progreso',
   moneda: 'Monedas',
   wonder_derrota: 'Derrota',
+  wonder_militar: 'Militar',
   militar: 'Derrota',
   wonder_progreso: 'Progreso',
   progreso: 'Progreso',
@@ -305,6 +320,7 @@ export const DUEL_PAD_METADATA_ORDER: ScoreCategoryMetadata[] = [
   'maravilla',
   'wonder_moneda',
   'moneda',
+  'wonder_militar',
   'wonder_progreso',
   'wonder_total',
 ];

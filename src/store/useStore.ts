@@ -14,6 +14,7 @@ import {
   clearSyncItem,
   importGamesSeedOnce,
   migrateDuelPadObsoleteCategories,
+  migrateDuelPadMilitar,
 } from '../db/localDb';
 import { syncItemToRemote, checkRemoteConnection, fetchRemoteState } from '../db/turso';
 import { gamesSeed } from '../utils/gamesSeed';
@@ -326,7 +327,9 @@ export const useStore = create<AppState>()((set, get) => ({
       }
 
       if (isWinner && game && (game.name.includes('7 Wonders'))) {
-        const militaryCat = game.scoringTemplate.categories.find(c => c.metadata === 'militar' || c.metadata === 'wonder_derrota');
+        const militaryCat = game.scoringTemplate.categories.find(c =>
+          c.metadata === 'militar' || c.metadata === 'wonder_derrota' || c.metadata === 'wonder_militar'
+        );
         if (militaryCat && playerScore) {
           const milScore = playerScore.scores[militaryCat.id] || 0;
           if (milScore === 0) {
@@ -357,6 +360,10 @@ export const useStore = create<AppState>()((set, get) => ({
     // scorepad de 7 Wonders Duel en registros ya guardados localmente.
     // Idempotente: marcada con una bandera en meta, solo corre una vez.
     await migrateDuelPadObsoleteCategories().catch((e) => console.error('Error migrating duel-pad categories:', e));
+
+    // Migración: añade la fila "Militar" a los registros de 7 Wonders Duel
+    // existentes que no la tengan. Idempotente.
+    await migrateDuelPadMilitar().catch((e) => console.error('Error migrating duel-pad militar:', e));
 
     const loaded = await loadLocalState();
     const originalQueue = await getSyncQueue();
