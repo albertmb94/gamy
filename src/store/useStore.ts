@@ -15,6 +15,7 @@ import {
   importGamesSeedOnce,
   migrateDuelPadObsoleteCategories,
   migrateDuelPadMilitar,
+  migrateDuelPadCategoriesV3,
 } from '../db/localDb';
 import { syncItemToRemote, checkRemoteConnection, fetchRemoteState } from '../db/turso';
 import { gamesSeed } from '../utils/gamesSeed';
@@ -72,6 +73,7 @@ interface AppState {
   loadFromLocalDb: () => Promise<void>;
   refreshPendingSync: () => Promise<void>;
   syncPendingItems: () => Promise<void>;
+  syncFromRemote: () => Promise<void>;
   checkConnection: () => Promise<void>;
 }
 
@@ -364,6 +366,11 @@ export const useStore = create<AppState>()((set, get) => ({
     // Migración: añade la fila "Militar" a los registros de 7 Wonders Duel
     // existentes que no la tengan. Idempotente.
     await migrateDuelPadMilitar().catch((e) => console.error('Error migrating duel-pad militar:', e));
+
+    // Migración: normaliza el scorepad de 7 Wonders Duel al set canónico
+    // (Azules, Amarillas, Moradas, Maravillas, Militar, Progreso, Dioses,
+    // Senado, Total). Idempotente.
+    await migrateDuelPadCategoriesV3().catch((e) => console.error('Error migrating duel-pad categories v3:', e));
 
     const loaded = await loadLocalState();
     const originalQueue = await getSyncQueue();

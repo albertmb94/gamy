@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ludotic-v1';
+const CACHE_NAME = 'ludotic-v2';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -32,6 +32,15 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function isCacheable(response, url) {
+  return (
+    response &&
+    response.ok &&
+    url.origin === self.location.origin &&
+    !response.headers.get('cache-control')?.includes('no-store')
+  );
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
@@ -42,31 +51,48 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // For same-origin navigation requests, serve the cached app shell.
+  // Same-origin navigations: network-first con fallback offline a la caché.
+  // Así los usuarios reciben siempre la última versión de la app y la caché
+  // solo cubre ausencia de red.
   if (url.origin === self.location.origin && request.mode === 'navigate') {
     event.respondWith(
-      caches.match('/index.html').then((cached) => cached || fetch(request)),
+      fetch(request)
+        .then((response) => {
+          if (isCacheable(response, url)) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match('/index.html').then(
+            (cached) =>
+              cached ||
+              new Response('Sin conexión', {
+                status: 503,
+                statusText: 'Offline',
+                headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+              }),
+          ),
+        ),
     );
     return;
   }
 
-  // For app assets, use cache-first.
+  // Resto de assets: stale-while-revalidate (respuesta instantánea desde
+  // caché mientras se actualiza en segundo plano).
   event.respondWith(
-    caches.match(request).then(
-      (cached) =>
-        cached ||
-        fetch(request).then((response) => {
-          // Cache only successful same-origin responses.
-          if (
-            response.ok &&
-            url.origin === self.location.origin &&
-            !response.headers.get('cache-control')?.includes('no-store')
-          ) {
+    caches.match(request).then((cached) => {
+      const refresh = fetch(request)
+        .then((response) => {
+          if (isCacheable(response, url)) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
-        }),
-    ),
+        })
+        .catch(() => cached);
+      return cached || refresh;
+    }),
   );
 });

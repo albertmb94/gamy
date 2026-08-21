@@ -23,6 +23,8 @@ export type ScoreCategoryMetadata =
   | 'wonder_derrota'      // Derrota militar (negativo, obsoleto)
   | 'wonder_militar'      // Puntuación militar (suma de victoria/derrota)
   | 'wonder_progreso'     // Tokens de progreso científico/civil
+  | 'wonder_dioses'       // Dioses (expansión Pantheon)
+  | 'wonder_senado'       // Senado (expansión Agora)
   | 'wonder_supremacia_militar'    // Token de supremacía militar
   | 'wonder_supremacia_cientifica' // Token de supremacía científica
   | 'wonder_supremacia_civil'      // Token de supremacía civil

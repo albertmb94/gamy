@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Play, Pause, Trash2, ArrowLeft } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
+import { Card, CardContent } from '../../components/ui/card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useRemigioStore } from '../../store/useRemigioStore';
 import { statusLabel } from '../engine';

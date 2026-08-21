@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { PlusCircle, Users, Trophy, Play, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useRemigioStore } from '../../store/useRemigioStore';
 import { statusLabel } from '../engine';

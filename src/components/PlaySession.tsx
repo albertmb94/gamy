@@ -204,87 +204,46 @@ function DuelPadScorepad({
   );
 }
 
-/** Bloque de supremacías 7WD. */
+/** Bloque de supremacías 7WD. Primero se marca la supremacía y después se
+ *  elige de forma explícita quién ganó: sin ganador no se puede guardar. */
 function DuelSupremacyPicker({
   selectedPlayers,
-  specialVictories,
-  setSpecialVictories,
-  setWinnerId,
+  value,
+  onChange,
   getPlayerTotal,
 }: {
   selectedPlayers: Player[];
-  specialVictories: Record<string, string>;
-  setSpecialVictories: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  setWinnerId: React.Dispatch<React.SetStateAction<string>>;
+  value: { type: string; winnerId: string } | null;
+  onChange: (next: { type: string; winnerId: string } | null) => void;
   getPlayerTotal: (playerId: string) => number;
 }) {
-  const winnerBySupremacy = (supType: string): string | undefined =>
-    Object.entries(specialVictories).find(([, v]) => v === supType)?.[0];
-
-  const activeSupType = Object.values(specialVictories)[0] as string | undefined;
-
-  const toggleSupremacy = (supType: string) => {
-    const currentWinner = winnerBySupremacy(supType);
-    if (currentWinner) {
-      setSpecialVictories(prev => {
-        const next = { ...prev };
-        delete next[currentWinner];
-        return next;
-      });
-      setWinnerId(prev => (prev === currentWinner ? '' : prev));
-    } else {
-      setSpecialVictories(() => {
-        const next: Record<string, string> = {};
-        if (selectedPlayers.length > 0) {
-          next[selectedPlayers[0].id] = supType;
-        }
-        return next;
-      });
-      if (selectedPlayers.length > 0) {
-        setWinnerId(selectedPlayers[0].id);
-      }
-    }
-  };
-
-  const pickWinner = (supType: string, playerId: string) => {
-    setSpecialVictories(prev => {
-      const next: Record<string, string> = {};
-      for (const [pid, v] of Object.entries(prev)) {
-        if (pid !== playerId && v !== supType) next[pid] = v;
-      }
-      next[playerId] = supType;
-      return next;
-    });
-    setWinnerId(playerId);
-  };
-
   return (
     <div className="glass-card p-4">
       <h3 className="text-sm font-bold text-foreground mb-1 flex items-center gap-2">
         <Award className="h-4 w-4" /> ¿Cómo terminó la partida?
       </h3>
       <p className="text-xs text-muted-foreground mb-3">
-        Marca la supremacía que decidió la partida (o déjalas vacías si terminó al agotar la edad 3).
+        Marca la supremacía que decidió la partida y elige quién ganó. Si terminó por puntos al agotar la edad 3, déjalo en blanco.
       </p>
       <div className="space-y-2">
         {SUPREMACY_OPTIONS.map(sup => {
-          const winnerIdForSup = winnerBySupremacy(sup.type);
-          const isActive = activeSupType === sup.type;
+          const isActive = value?.type === sup.type;
           const style = getDuelPadRowStyle(sup.meta);
-          const winnerPlayer = winnerIdForSup
-            ? selectedPlayers.find(p => p.id === winnerIdForSup)
+          const winnerPlayer = isActive && value?.winnerId
+            ? selectedPlayers.find(p => p.id === value.winnerId)
             : null;
+          const missingWinner = isActive && !value?.winnerId;
           return (
             <div
               key={sup.type}
               className={cn(
                 'rounded-2xl border-2 transition-all overflow-hidden',
-                isActive ? 'border-foreground/30 shadow-sm' : 'border-border'
+                missingWinner ? 'border-amber-400 shadow-sm' : isActive ? 'border-foreground/30 shadow-sm' : 'border-border'
               )}
             >
               <button
                 type="button"
-                onClick={() => toggleSupremacy(sup.type)}
+                onClick={() => onChange(isActive ? null : { type: sup.type, winnerId: '' })}
                 className={cn(
                   'w-full flex items-center gap-3 p-3 text-left transition-colors',
                   isActive ? 'text-white' : 'text-foreground hover:bg-secondary'
@@ -309,39 +268,39 @@ function DuelSupremacyPicker({
                   {sup.label}
                 </span>
                 {winnerPlayer && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold bg-white/20 px-2 py-0.5 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-white/20 px-2 py-0.5 rounded-full">
                     <Crown className="h-3 w-3" /> {winnerPlayer.name}
                   </span>
                 )}
               </button>
 
-              <div
-                className={cn(
-                  'flex flex-wrap items-center gap-1.5 px-3 py-2.5 border-t border-black/10',
-                  isActive ? 'bg-secondary' : 'bg-secondary/60'
-                )}
-              >
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mr-1">
-                  Ganador:
-                </span>
-                {selectedPlayers.map(p => {
-                  const isWinner = specialVictories[p.id] === sup.type;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => pickWinner(sup.type, p.id)}
-                      className={cn(
-                        'chip text-xs',
-                        isWinner && 'bg-amber-500 text-white border-transparent'
-                      )}
-                    >
-                      {p.name}
-                      <span className="text-[10px] opacity-70">({getPlayerTotal(p.id)})</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {isActive && (
+                <div className="flex flex-wrap items-center gap-1.5 px-3 py-2.5 border-t border-black/10 bg-secondary">
+                  <span className={cn(
+                    'text-[11px] font-semibold uppercase tracking-wider mr-1',
+                    missingWinner ? 'text-amber-600' : 'text-muted-foreground'
+                  )}>
+                    {missingWinner ? '¿Quién ganó?' : 'Ganador:'}
+                  </span>
+                  {selectedPlayers.map(p => {
+                    const isWinner = value?.winnerId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => onChange({ type: sup.type, winnerId: isWinner ? '' : p.id })}
+                        className={cn(
+                          'chip text-xs',
+                          isWinner && 'bg-amber-500 text-white border-transparent'
+                        )}
+                      >
+                        {p.name}
+                        <span className="text-[10px] opacity-70">({getPlayerTotal(p.id)})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
@@ -359,6 +318,7 @@ export default function PlaySession() {
   const [firstPlayerId, setFirstPlayerId] = useState('');
   const [playerScores, setPlayerScores] = useState<Record<string, Record<string, number>>>({});
   const [specialVictories, setSpecialVictories] = useState<Record<string, string>>({});
+  const [duelSup, setDuelSup] = useState<{ type: string; winnerId: string } | null>(null);
   const [winnerId, setWinnerId] = useState('');
   const [gameSearch, setGameSearch] = useState('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -444,8 +404,10 @@ export default function PlaySession() {
   };
 
   const hasAnySpecialVictory = Object.keys(specialVictories).length > 0;
+  const supMissingWinner = !!duelSup && !duelSup.winnerId;
 
   const determineWinner = (): string => {
+    if (duelSup?.winnerId) return duelSup.winnerId;
     if (hasAnySpecialVictory) {
       return Object.keys(specialVictories)[0];
     }
@@ -459,12 +421,15 @@ export default function PlaySession() {
   };
 
   const handleFinish = () => {
-    const finalWinnerId = winnerId || determineWinner();
+    if (supMissingWinner) return;
+    const finalWinnerId = duelSup?.winnerId || winnerId || determineWinner();
     const finalScores: PlayerScore[] = selectedPlayerIds.map(pid => ({
       playerId: pid,
       scores: playerScores[pid] || {},
       total: getPlayerTotal(pid),
-      specialVictory: specialVictories[pid],
+      specialVictory: duelSup
+        ? (pid === duelSup.winnerId ? duelSup.type : undefined)
+        : specialVictories[pid],
     }));
 
     addMatch({
@@ -484,6 +449,7 @@ export default function PlaySession() {
     setFirstPlayerId('');
     setPlayerScores({});
     setSpecialVictories({});
+    setDuelSup(null);
     setWinnerId('');
     setGameSearch('');
     setFavoritesOnly(false);
@@ -775,9 +741,8 @@ export default function PlaySession() {
         {useDuelPad && (
           <DuelSupremacyPicker
             selectedPlayers={selectedPlayers}
-            specialVictories={specialVictories}
-            setSpecialVictories={setSpecialVictories}
-            setWinnerId={setWinnerId}
+            value={duelSup}
+            onChange={setDuelSup}
             getPlayerTotal={getPlayerTotal}
           />
         )}
@@ -796,8 +761,15 @@ export default function PlaySession() {
           </div>
         )}
 
+        {supMissingWinner && (
+          <p className="text-xs text-amber-600 font-semibold text-center">
+            Elige el ganador de la supremacía para guardar la partida.
+          </p>
+        )}
+
         <button onClick={handleFinish}
-          className="w-full btn btn-success py-3.5 text-base">
+          disabled={supMissingWinner}
+          className="w-full btn btn-success py-3.5 text-base disabled:opacity-50 disabled:pointer-events-none">
           <Check className="h-5 w-5" /> Guardar partida
         </button>
       </div>

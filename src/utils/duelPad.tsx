@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Building2, Hexagon, Pyramid, XCircle, Sigma, Award, Landmark, Swords } from 'lucide-react';
+import { Building2, Hexagon, Pyramid, XCircle, Sigma, Award, Landmark, Shield, Sparkles } from 'lucide-react';
 import type { ScoreCategory, ScoreCategoryMetadata } from '../types';
 
 // Tipos de fila del scorepad Duel. Incluyen la cabecera decorativa
@@ -152,14 +152,7 @@ export const DUEL_PAD_ROW_STYLES: Record<DuelPadRowKind, DuelPadRowStyle> = {
   wonder_militar: {
     bg: '#FEE2E2',
     iconBg: '#FECACA',
-    icon: (
-      <span
-        className="relative inline-flex items-center justify-center rounded-full border border-black/30"
-        style={{ width: 26, height: 26, backgroundColor: '#B91C1C' }}
-      >
-        <Swords className="h-4 w-4" style={{ color: '#FFFFFF' }} />
-      </span>
-    ),
+    icon: <Shield className="h-5 w-5" style={{ color: DEFEAT_RED }} />,
   },
   militar: {
     bg: '#FFE4E6',
@@ -175,6 +168,16 @@ export const DUEL_PAD_ROW_STYLES: Record<DuelPadRowKind, DuelPadRowStyle> = {
     bg: '#F1F5F9',
     iconBg: '#F8FAFC',
     icon: <ProgressToken />,
+  },
+  wonder_dioses: {
+    bg: '#E0F2FE',
+    iconBg: '#BAE6FD',
+    icon: <Sparkles className="h-5 w-5" style={{ color: '#0369A1' }} />,
+  },
+  wonder_senado: {
+    bg: '#F5F5F4',
+    iconBg: '#E7E5E4',
+    icon: <Building2 className="h-5 w-5" style={{ color: '#44403C' }} />,
   },
   wonder_total: {
     bg: '#0F172A',
@@ -228,15 +231,13 @@ export const DUEL_PAD_ROW_STYLES: Record<DuelPadRowKind, DuelPadRowStyle> = {
 export const DUEL_PAD_ROW_ORDER: DuelPadRowKind[] = [
   'wonder_header',
   'wonder_civil',
-  'wonder_comercio',
   'wonder_recurso',
   'wonder_gremio',
-  'ciencia',
   'maravilla',
-  'wonder_moneda',
-  'moneda',
   'wonder_militar',
   'wonder_progreso',
+  'wonder_dioses',
+  'wonder_senado',
   'wonder_total',
 ];
 
@@ -244,22 +245,24 @@ export function getDuelPadRowStyle(kind: DuelPadRowKind): DuelPadRowStyle {
   return DUEL_PAD_ROW_STYLES[kind];
 }
 
-/** Categorías por defecto para el scorepad de 7 Wonders Duel.
- *  NOTA: las supremacías NO son filas del scorepad — son la condición de
- *  victoria que se marca en el bloque inferior (DuelSupremacyPicker). El
- *  estilo/ícono de cada supremacía se reutiliza desde DUEL_PAD_ROW_STYLES. */
+/** Categorías por defecto para el scorepad de 7 Wonders Duel (bloc oficial
+ *  + Pantheon + Agora). Las supremacías NO son filas del scorepad — son la
+ *  condición de victoria que se marca en el bloque inferior
+ *  (DuelSupremacyPicker). El estilo/ícono de cada supremacía se reutiliza
+ *  desde DUEL_PAD_ROW_STYLES.
+ *
+ *  Los `id` son estables: las migraciones los conservan para no perder las
+ *  puntuaciones de partidas históricas. */
 export function buildDuelPadCategories(): ScoreCategory[] {
   return [
     { id: 'civil', name: 'Azules', metadata: 'wonder_civil' },
-    { id: 'comercio', name: 'Verdes', metadata: 'wonder_comercio' },
     { id: 'recurso', name: 'Amarillas', metadata: 'wonder_recurso' },
     { id: 'gremio', name: 'Moradas', metadata: 'wonder_gremio' },
-    { id: 'ciencia', name: 'Ciencia', metadata: 'ciencia' },
-    { id: 'etapa', name: 'Etapas', metadata: 'maravilla' },
-    { id: 'moneda_v', name: 'F. Progreso', metadata: 'wonder_moneda' },
-    { id: 'moneda_a', name: 'Monedas', metadata: 'moneda' },
+    { id: 'etapa', name: 'Maravillas', metadata: 'maravilla' },
     { id: 'militar', name: 'Militar', metadata: 'wonder_militar' },
     { id: 'progreso', name: 'Progreso', metadata: 'wonder_progreso' },
+    { id: 'dioses', name: 'Dioses', metadata: 'wonder_dioses' },
+    { id: 'senado', name: 'Senado', metadata: 'wonder_senado' },
     { id: 'total', name: 'Total', metadata: 'wonder_total' },
   ];
 }
@@ -277,7 +280,7 @@ export const DUEL_PAD_ROW_LABELS: Record<DuelPadRowKind, string> = {
   wonder_recurso: 'Amarillas',
   wonder_gremio: 'Moradas',
   ciencia: 'Ciencia',
-  maravilla: 'Etapas',
+  maravilla: 'Maravillas',
   wonder_moneda: 'F. Progreso',
   moneda: 'Monedas',
   wonder_derrota: 'Derrota',
@@ -285,6 +288,8 @@ export const DUEL_PAD_ROW_LABELS: Record<DuelPadRowKind, string> = {
   militar: 'Derrota',
   wonder_progreso: 'Progreso',
   progreso: 'Progreso',
+  wonder_dioses: 'Dioses',
+  wonder_senado: 'Senado',
   wonder_total: 'Total',
   wonder_supremacia_militar: 'Supremacía militar',
   wonder_supremacia_cientifica: 'Supremacía científica',
@@ -307,31 +312,36 @@ export const SUPREMACY_TYPES = [
 ] as const;
 export type SupremacyType = typeof SUPREMACY_TYPES[number];
 
-/** Categorías del scorepad Duel en el orden visual de la imagen. Las
- *  supremacías no entran aquí: son la condición de victoria, no una fila.
- *  La derrota queda excluida porque ya no se puntúa (se decide por
- *  supremacía / ganador en la sección inferior). */
+/** Categorías del scorepad Duel en el orden visual del bloc oficial
+ *  (Azules, Amarillas, Moradas, Maravillas, Militar, Progreso, Dioses,
+ *  Senado, Total). Las supremacías no entran aquí: son la condición de
+ *  victoria, no una fila. */
 export const DUEL_PAD_METADATA_ORDER: ScoreCategoryMetadata[] = [
   'wonder_civil',
-  'wonder_comercio',
   'wonder_recurso',
   'wonder_gremio',
-  'ciencia',
   'maravilla',
-  'wonder_moneda',
-  'moneda',
   'wonder_militar',
   'wonder_progreso',
+  'wonder_dioses',
+  'wonder_senado',
   'wonder_total',
 ];
 
-/** Metadatos que NUNCA deben renderizarse como fila del scorepad Duel. */
+/** Metadatos que NUNCA deben renderizarse como fila del scorepad Duel:
+ *  supremacías (son condición de victoria), la derrota (obsoleta) y las
+ *  filas retiradas que no puntúan en 7 Wonders Duel (verdes, ciencia,
+ *  monedas y fichas de progreso duplicadas). */
 export const DUEL_PAD_EXCLUDED_METADATA: ReadonlySet<ScoreCategoryMetadata> = new Set([
   'wonder_derrota',
   'wonder_supremacia_militar',
   'wonder_supremacia_cientifica',
   'wonder_supremacia_civil',
   'militar', // legacy: usado en achievements pero no en filas
+  'wonder_comercio', // legacy: los verdes no puntúan (dan progreso)
+  'ciencia', // legacy: sustituida por Progreso/Dioses
+  'wonder_moneda', // legacy: F. Progreso duplicada
+  'moneda', // legacy: las monedas no puntúan en Duel
 ]);
 
 /** Etiquetas mostradas en las supremacy cards de la sección inferior. */

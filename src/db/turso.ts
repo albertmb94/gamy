@@ -1,6 +1,9 @@
-import { createClient, Client } from '@libsql/client/web';
-import { DbStatus, Game, Player, MatchRecord, PlayerAchievement } from '../types';
+import { createClient, Client, type InValue } from '@libsql/client/web';
+import { DbStatus, Game, GameType, Player, MatchRecord, PlayerAchievement } from '../types';
 import { RemigioSession } from '../remigio/types';
+
+/** Convierte valores unknown a InValue para los args de libsql. */
+const inArgs = (...vals: unknown[]): InValue[] => vals as InValue[];
 
 /**
  * Ludotic Database Connection Layer
@@ -187,16 +190,16 @@ export async function syncItemToRemote(
       const p = payload as Record<string, unknown>;
 
       if (isDelete) {
-        if (type === 'game') await client.execute({ sql: 'DELETE FROM games WHERE id = ?', args: [p.id] });
-        else if (type === 'player') await client.execute({ sql: 'DELETE FROM players WHERE id = ?', args: [p.id] });
-        else if (type === 'match') await client.execute({ sql: 'DELETE FROM matches WHERE id = ?', args: [p.id] });
+        if (type === 'game') await client.execute({ sql: 'DELETE FROM games WHERE id = ?', args: inArgs(p.id) });
+        else if (type === 'player') await client.execute({ sql: 'DELETE FROM players WHERE id = ?', args: inArgs(p.id) });
+        else if (type === 'match') await client.execute({ sql: 'DELETE FROM matches WHERE id = ?', args: inArgs(p.id) });
         else if (type === 'achievement') {
           await client.execute({
             sql: 'DELETE FROM player_achievements WHERE achievement_id = ? AND player_id = ?',
-            args: [p.achievementId, p.playerId],
+            args: inArgs(p.achievementId, p.playerId),
           });
         }
-        else if (type === 'remigio') await client.execute({ sql: 'DELETE FROM remigio_sessions WHERE id = ?', args: [p.id] });
+        else if (type === 'remigio') await client.execute({ sql: 'DELETE FROM remigio_sessions WHERE id = ?', args: inArgs(p.id) });
         return true;
       }
 
@@ -318,7 +321,7 @@ export async function fetchRemoteState(): Promise<{
       id: row.id,
       name: row.name,
       imageUrl: row.image_url ?? undefined,
-      types: safeJson<string[]>(row.types, []),
+      types: safeJson(row.types, [] as GameType[]),
       isExpansion: Boolean(row.is_expansion),
       baseGameId: row.base_game_id ?? undefined,
       expansionIds: safeJson<string[]>(row.expansion_ids, []),

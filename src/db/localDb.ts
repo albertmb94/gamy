@@ -1,6 +1,7 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Game, Player, MatchRecord, PlayerAchievement, ScoreCategory } from '../types';
 import { RemigioSession } from '../remigio/types';
+import { buildDuelPadCategories, SUPREMACY_TYPES } from '../utils/duelPad';
 
 const DB_NAME = 'ludotic-db';
 const DB_VERSION = 4;
@@ -353,5 +354,66 @@ export async function migrateDuelPadMilitar(): Promise<void> {
   await tx.done;
   if (changed) {
     console.log('[migrateDuelPadMilitar] fila Militar añadida');
+  }
+}
+
+/**
+ * Normaliza la plantilla de cualquier juego 7 Wonders Duel al set canónico
+ * del bloc oficial + Pantheon + Agora: Azules, Amarillas, Moradas,
+ * Maravillas, Militar, Progreso, Dioses, Senado y Total. Elimina las filas
+ * retiradas (Verdes, Ciencia, F. Progreso y Monedas) que no puntúan en
+ * Duel. Conserva los ids existentes siempre que sea posible para no perder
+ * las puntuaciones de partidas históricas. Idempotente (bandera en meta).
+ */
+export async function migrateDuelPadCategoriesV3(): Promise<void> {
+  const db = await getDb();
+  const done = await db.get('meta', 'duelPadMigratedV3');
+  if (done === true) return;
+
+  const tx = db.transaction(['games', 'meta'], 'readwrite');
+  const store = tx.objectStore('games');
+  const all = (await store.getAll()) as Game[];
+  let changed = false;
+  for (const g of all) {
+    const isDuel =
+      g.scoringTemplate.layout === 'duel-pad' ||
+      /7\s*wonders\s*duel/i.test(g.name);
+    if (!isDuel) continue;
+
+    const cats = g.scoringTemplate.categories;
+    const byId = new Map(cats.map(c => [c.id, c]));
+    const byMeta = new Map(
+      cats.filter(c => !!c.metadata).map(c => [c.metadata as string, c]),
+    );
+
+    // Para cada fila canónica se reutiliza la categoría ya existente con el
+    // mismo id (o la que tenga el mismo metadata en plantillas antiguas),
+    // de modo que las puntuaciones guardadas sigan encajando.
+    const categories: ScoreCategory[] = buildDuelPadCategories().map(def => {
+      const found = byId.get(def.id) ?? byMeta.get(def.metadata ?? '');
+      return found ? { ...found, name: def.name, metadata: def.metadata } : def;
+    });
+
+    const specialVictoryTypes = Array.from(
+      new Set([...(g.specialVictoryTypes || []), ...SUPREMACY_TYPES]),
+    );
+
+    await store.put({
+      ...g,
+      scoringTemplate: {
+        ...g.scoringTemplate,
+        type: 'complex',
+        layout: 'duel-pad',
+        categories,
+      },
+      allowSpecialVictory: true,
+      specialVictoryTypes,
+    });
+    changed = true;
+  }
+  await tx.objectStore('meta').put(true, 'duelPadMigratedV3');
+  await tx.done;
+  if (changed) {
+    console.log('[migrateDuelPadCategoriesV3] plantillas Duel normalizadas');
   }
 }
