@@ -160,9 +160,9 @@ export const DUEL_PAD_ROW_STYLES: Record<DuelPadRowKind, DuelPadRowStyle> = {
     icon: <XCircle className="h-5 w-5" style={{ color: DEFEAT_RED }} />,
   },
   wonder_progreso: {
-    bg: '#F1F5F9',
-    iconBg: '#F8FAFC',
-    icon: <ProgressToken />,
+    bg: '#DCFCE7',
+    iconBg: '#F0FDF4',
+    icon: <ColoredCoin color={COIN_GREEN} />,
   },
   progreso: {
     bg: '#F1F5F9',
@@ -231,12 +231,14 @@ export const DUEL_PAD_ROW_STYLES: Record<DuelPadRowKind, DuelPadRowStyle> = {
 export const DUEL_PAD_ROW_ORDER: DuelPadRowKind[] = [
   'wonder_header',
   'wonder_civil',
+  'wonder_comercio',
   'wonder_recurso',
   'wonder_gremio',
-  'maravilla',
-  'wonder_militar',
-  'wonder_progreso',
   'wonder_dioses',
+  'maravilla',
+  'wonder_progreso',
+  'moneda',
+  'wonder_militar',
   'wonder_senado',
   'wonder_total',
 ];
@@ -245,23 +247,25 @@ export function getDuelPadRowStyle(kind: DuelPadRowKind): DuelPadRowStyle {
   return DUEL_PAD_ROW_STYLES[kind];
 }
 
-/** Categorías por defecto para el scorepad de 7 Wonders Duel (bloc oficial
- *  + Pantheon + Agora). Las supremacías NO son filas del scorepad — son la
- *  condición de victoria que se marca en el bloque inferior
- *  (DuelSupremacyPicker). El estilo/ícono de cada supremacía se reutiliza
- *  desde DUEL_PAD_ROW_STYLES.
+/** Categorías por defecto para el scorepad de 7 Wonders Duel en el orden
+ *  acordado: Azules, Verdes, Amarillas, Moradas, Dioses, Maravillas,
+ *  Fichas Progreso, Monedas, Militar, Senado y Total (siempre abajo).
+ *  Las supremacías NO son filas del scorepad — son la condición de victoria
+ *  que se marca en el bloque inferior (DuelSupremacyPicker).
  *
  *  Los `id` son estables: las migraciones los conservan para no perder las
  *  puntuaciones de partidas históricas. */
 export function buildDuelPadCategories(): ScoreCategory[] {
   return [
     { id: 'civil', name: 'Azules', metadata: 'wonder_civil' },
+    { id: 'comercio', name: 'Verdes', metadata: 'wonder_comercio' },
     { id: 'recurso', name: 'Amarillas', metadata: 'wonder_recurso' },
     { id: 'gremio', name: 'Moradas', metadata: 'wonder_gremio' },
-    { id: 'etapa', name: 'Maravillas', metadata: 'maravilla' },
-    { id: 'militar', name: 'Militar', metadata: 'wonder_militar' },
-    { id: 'progreso', name: 'Progreso', metadata: 'wonder_progreso' },
     { id: 'dioses', name: 'Dioses', metadata: 'wonder_dioses' },
+    { id: 'etapa', name: 'Maravillas', metadata: 'maravilla' },
+    { id: 'progreso', name: 'Fichas Progreso', metadata: 'wonder_progreso' },
+    { id: 'monedas', name: 'Monedas', metadata: 'moneda' },
+    { id: 'militar', name: 'Militar', metadata: 'wonder_militar' },
     { id: 'senado', name: 'Senado', metadata: 'wonder_senado' },
     { id: 'total', name: 'Total', metadata: 'wonder_total' },
   ];
@@ -286,7 +290,7 @@ export const DUEL_PAD_ROW_LABELS: Record<DuelPadRowKind, string> = {
   wonder_derrota: 'Derrota',
   wonder_militar: 'Militar',
   militar: 'Derrota',
-  wonder_progreso: 'Progreso',
+  wonder_progreso: 'Fichas Progreso',
   progreso: 'Progreso',
   wonder_dioses: 'Dioses',
   wonder_senado: 'Senado',
@@ -312,36 +316,35 @@ export const SUPREMACY_TYPES = [
 ] as const;
 export type SupremacyType = typeof SUPREMACY_TYPES[number];
 
-/** Categorías del scorepad Duel en el orden visual del bloc oficial
- *  (Azules, Amarillas, Moradas, Maravillas, Militar, Progreso, Dioses,
- *  Senado, Total). Las supremacías no entran aquí: son la condición de
- *  victoria, no una fila. */
+/** Categorías del scorepad Duel en el orden visual acordado (Azules,
+ *  Verdes, Amarillas, Moradas, Dioses, Maravillas, Fichas Progreso,
+ *  Monedas, Militar, Senado, Total). Las supremacías no entran aquí: son
+ *  la condición de victoria, no una fila. */
 export const DUEL_PAD_METADATA_ORDER: ScoreCategoryMetadata[] = [
   'wonder_civil',
+  'wonder_comercio',
   'wonder_recurso',
   'wonder_gremio',
-  'maravilla',
-  'wonder_militar',
-  'wonder_progreso',
   'wonder_dioses',
+  'maravilla',
+  'wonder_progreso',
+  'moneda',
+  'wonder_militar',
   'wonder_senado',
   'wonder_total',
 ];
 
 /** Metadatos que NUNCA deben renderizarse como fila del scorepad Duel:
- *  supremacías (son condición de victoria), la derrota (obsoleta) y las
- *  filas retiradas que no puntúan en 7 Wonders Duel (verdes, ciencia,
- *  monedas y fichas de progreso duplicadas). */
+ *  supremacías (son condición de victoria), la derrota (obsoleta), y filas
+ *  legacy retiradas o duplicadas que ya tienen su fila canónica. */
 export const DUEL_PAD_EXCLUDED_METADATA: ReadonlySet<ScoreCategoryMetadata> = new Set([
   'wonder_derrota',
   'wonder_supremacia_militar',
   'wonder_supremacia_cientifica',
   'wonder_supremacia_civil',
   'militar', // legacy: usado en achievements pero no en filas
-  'wonder_comercio', // legacy: los verdes no puntúan (dan progreso)
-  'ciencia', // legacy: sustituida por Progreso/Dioses
-  'wonder_moneda', // legacy: F. Progreso duplicada
-  'moneda', // legacy: las monedas no puntúan en Duel
+  'ciencia', // legacy: sustituida por Fichas Progreso/Dioses
+  'wonder_moneda', // legacy: duplicada por Fichas Progreso
 ]);
 
 /** Etiquetas mostradas en las supremacy cards de la sección inferior. */

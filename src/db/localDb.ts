@@ -359,15 +359,15 @@ export async function migrateDuelPadMilitar(): Promise<void> {
 
 /**
  * Normaliza la plantilla de cualquier juego 7 Wonders Duel al set canónico
- * del bloc oficial + Pantheon + Agora: Azules, Amarillas, Moradas,
- * Maravillas, Militar, Progreso, Dioses, Senado y Total. Elimina las filas
- * retiradas (Verdes, Ciencia, F. Progreso y Monedas) que no puntúan en
- * Duel. Conserva los ids existentes siempre que sea posible para no perder
- * las puntuaciones de partidas históricas. Idempotente (bandera en meta).
+ * acordado, en este orden: Azules, Verdes, Amarillas, Moradas, Dioses,
+ * Maravillas, Fichas Progreso, Monedas, Militar, Senado y Total (siempre
+ * abajo). Conserva los ids existentes siempre que sea posible para no
+ * perder las puntuaciones de partidas históricas. Idempotente (bandera en
+ * meta).
  */
-export async function migrateDuelPadCategoriesV3(): Promise<void> {
+export async function migrateDuelPadCategoriesV4(): Promise<void> {
   const db = await getDb();
-  const done = await db.get('meta', 'duelPadMigratedV3');
+  const done = await db.get('meta', 'duelPadMigratedV4');
   if (done === true) return;
 
   const tx = db.transaction(['games', 'meta'], 'readwrite');
@@ -411,9 +411,9 @@ export async function migrateDuelPadCategoriesV3(): Promise<void> {
     });
     changed = true;
   }
-  await tx.objectStore('meta').put(true, 'duelPadMigratedV3');
+  await tx.objectStore('meta').put(true, 'duelPadMigratedV4');
   await tx.done;
   if (changed) {
-    console.log('[migrateDuelPadCategoriesV3] plantillas Duel normalizadas');
+    console.log('[migrateDuelPadCategoriesV4] plantillas Duel normalizadas');
   }
 }
