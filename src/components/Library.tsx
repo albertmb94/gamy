@@ -581,7 +581,7 @@ export default function Library() {
         <div className="flex-1 relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar juego..."
-            className="input-field pl-10" />
+            className="input-field has-icon" />
         </div>
         <button
           onClick={() => setFavoritesOnly(v => !v)}
@@ -663,28 +663,32 @@ export default function Library() {
           const expansionCount = games.filter(g => g.baseGameId === game.id).length;
           return (
             <div key={game.id} className="text-left animate-slide-up group">
-              <button
-                onClick={() => setSelectedGame(game)}
-                className="block w-full aspect-square rounded-2xl overflow-hidden relative bg-gradient-to-br from-zinc-100 to-zinc-200"
-              >
-                {game.imageUrl ? (
-                  <img src={game.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-                ) : (
-                  <GameCover game={game} className="group-hover:scale-105 transition-transform duration-500 rounded-2xl" />
-                )}
-                {expansionCount > 0 && (
-                  <span className="absolute top-2 right-2 text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-bold backdrop-blur-sm">
-                    +{expansionCount}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); toggleFavorite(game.id); }}
-                title={game.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                className={cn('absolute -mt-7 ml-2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all border border-white/20 shadow-sm', game.isFavorite ? 'bg-rose-500 text-white border-transparent' : 'bg-black/40 text-white hover:bg-black/55')}>
-                <Heart className={cn('h-3.5 w-3.5', game.isFavorite && 'fill-current')} />
-              </button>
+              {/* Contenedor relative: el botón de favorito se ancla a la
+                  portada; sin él, el absolute "flota" según el motor. */}
+              <div className="relative">
+                <button
+                  onClick={() => setSelectedGame(game)}
+                  className="block w-full aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-zinc-100 to-zinc-200"
+                >
+                  {game.imageUrl ? (
+                    <img src={game.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                  ) : (
+                    <GameCover game={game} className="group-hover:scale-105 transition-transform duration-500 rounded-2xl" />
+                  )}
+                  {expansionCount > 0 && (
+                    <span className="absolute top-2 right-2 text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-bold backdrop-blur-sm">
+                      +{expansionCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleFavorite(game.id); }}
+                  title={game.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                  className={cn('absolute bottom-2 left-2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all border border-white/20 shadow-sm', game.isFavorite ? 'bg-rose-500 text-white border-transparent' : 'bg-black/40 text-white hover:bg-black/55')}>
+                  <Heart className={cn('h-3.5 w-3.5', game.isFavorite && 'fill-current')} />
+                </button>
+              </div>
               <div className="pt-2 px-1">
                 <h3 className="text-foreground text-sm font-bold leading-tight truncate">{game.name}</h3>
                 <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">

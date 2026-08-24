@@ -474,7 +474,7 @@ export default function PlaySession() {
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <input value={gameSearch} onChange={e => setGameSearch(e.target.value)} placeholder="Buscar juego..."
-            className="input-field pl-10" />
+            className="input-field has-icon" />
           {gameSearch && (
             <button onClick={() => setGameSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
           )}

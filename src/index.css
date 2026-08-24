@@ -112,6 +112,8 @@ body {
   inset: 0;
   width: 100%;
   height: 100%;
+  /* Desactiva el zoom por doble tap (el pellizco se bloquea en index.html). */
+  touch-action: manipulation;
 }
 
 #root {
@@ -187,6 +189,10 @@ input[type="number"] { -moz-appearance: textfield; }
   border-color: hsl(var(--ring));
   box-shadow: 0 0 0 3px hsl(var(--ring) / 0.12);
 }
+/* Input con icono a la izquierda: el shorthand `padding` de .input-field
+   pisa el pl-10 de Tailwind (utilities van en @layer), dejando el texto
+   encima del icono. */
+.input-field.has-icon { padding-left: 2.5rem; }
 select.input-field { appearance: none; -webkit-appearance: none; }
 
 /* ----- Buttons (pill-shaped como en la imagen) ----- */

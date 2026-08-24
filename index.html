@@ -19,6 +19,12 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
+      // Bloqueo de zoom: iOS Safari ignora user-scalable=no, así que se
+      // cancelan los gestos de pellizco (gesturestart/change) explícitamente.
+      document.addEventListener('gesturestart', (e) => e.preventDefault());
+      document.addEventListener('gesturechange', (e) => e.preventDefault());
+    </script>
+    <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').catch((err) => {
