@@ -98,7 +98,6 @@
 
 html {
   overflow-x: hidden;
-  touch-action: pan-y;
   overscroll-behavior: none;
 }
 
@@ -121,6 +120,12 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
+}
+
+/* Bloqueo de scroll de fondo mientras hay un modal abierto (lo gestiona
+   el hook useModalLock añadiendo la clase a <body>). */
+body.modal-open #root {
+  overflow: hidden;
 }
 
 /* Hide scrollbars */
@@ -253,10 +258,13 @@ select.input-field { appearance: none; -webkit-appearance: none; }
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
-  z-index: 50;
+  /* Por encima del bottom nav (z-50) y del módulo Remigio (z-[60]):
+     si no, el menú flotante tapa los botones inferiores del panel en mobile. */
+  z-index: 70;
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 @media (min-width: 640px) {
   .modal-overlay { align-items: center; padding: 1rem; }
@@ -266,6 +274,8 @@ select.input-field { appearance: none; -webkit-appearance: none; }
   max-width: 32rem;
   max-height: 92vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: 1.5rem 1.5rem 0 0;
@@ -292,6 +302,7 @@ select.input-field { appearance: none; -webkit-appearance: none; }
   padding: 1rem 1rem 6rem 1rem;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ----- "Now playing" pill bar (encima del bottom nav, negra con esquinas

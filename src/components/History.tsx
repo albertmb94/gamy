@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 import { useRemigioStore } from '../store/useRemigioStore';
 import { statusLabel } from '../remigio/engine';
 import { cn } from '../utils/cn';
+import { useModalLock } from '../utils/useModalLock';
 import { Game, Player, PlayerScore, ScoreCategory } from '../types';
 import {
   DUEL_PAD_EXCLUDED_METADATA,
@@ -65,6 +66,9 @@ export default function History() {
 
   const detailMatch = detailId ? matches.find(m => m.id === detailId) : null;
   const detailGame = detailMatch ? games.find(g => g.id === detailMatch.gameId) : null;
+
+  // Bloquea el scroll de fondo mientras el detalle/edición está abierto.
+  useModalLock(!!detailMatch);
 
   const formatDate = (d: string) => {
     const date = new Date(d);
@@ -146,7 +150,10 @@ export default function History() {
 
     const computeTotal = (pid: string) => {
       if (allCats.length === 0) return editDraft.scores[pid]?.['total'] || 0;
-      return allCats.reduce((sum, cat) => sum + (editDraft.scores[pid]?.[cat.id] || 0), 0);
+      // La fila Total (wonder_total) es calculada: no se suma para evitar
+      // doble conteo con valores heredados de partidas antiguas.
+      return allCats.reduce((sum, cat) =>
+        cat.metadata === 'wonder_total' ? sum : sum + (editDraft.scores[pid]?.[cat.id] || 0), 0);
     };
 
     const playerScores: PlayerScore[] = editDraft.playerIds.map(pid => ({
@@ -164,9 +171,11 @@ export default function History() {
       });
     }
 
+    const parsedDate = new Date(editDraft.date);
+
     updateMatch(detailMatch.id, {
       gameId: editDraft.gameId,
-      date: new Date(editDraft.date).toISOString(),
+      date: isNaN(parsedDate.getTime()) ? detailMatch.date : parsedDate.toISOString(),
       playerIds: editDraft.playerIds,
       activeExpansionIds: sameGame ? detailMatch.activeExpansionIds : [],
       playerScores,
@@ -433,58 +442,80 @@ export default function History() {
                 );
               }
 
-              const shownPlayers = editDraft ? editDraft.playerIds : detailMatch.playerIds;
+              // Filas construidas SIEMPRE a partir de la lista de jugadores
+              // mostrados (no de las puntuaciones almacenadas): así, al añadir
+              // un jugador nuevo durante la edición, su fila aparece con inputs.
+              const shownIds = editDraft ? editDraft.playerIds : detailMatch.playerIds;
+              const isSimple = draftGame.scoringTemplate.type === 'simple';
+              const rowTotal = (pid: string): number => {
+                const stored = detailMatch.playerScores.find(ps => ps.playerId === pid);
+                if (!editDraft) return stored?.total || 0;
+                const sc = editDraft.scores[pid] || {};
+                if (isSimple && cats.length === 0) return sc['total'] || 0;
+                return cats.reduce((sum, c) =>
+                  c.metadata === 'wonder_total' ? sum : sum + (sc[c.id] || 0), 0);
+              };
+              const currentWinnerId = editDraft
+                ? (editDraft.sup?.playerId || editDraft.winnerId || undefined)
+                : detailMatch.winnerId;
+
+              const rows = shownIds
+                .map(pid => {
+                  const player = players.find(p => p.id === pid);
+                  if (!player) return null;
+                  const stored = detailMatch.playerScores.find(ps => ps.playerId === pid);
+                  const scores = editDraft ? (editDraft.scores[pid] || {}) : (stored?.scores || {});
+                  const specialVictory = editDraft
+                    ? (editDraft.sup?.playerId === pid ? editDraft.sup.type : undefined)
+                    : stored?.specialVictory;
+                  return { playerId: pid, player, scores, total: rowTotal(pid), specialVictory };
+                })
+                .filter((r): r is NonNullable<typeof r> => !!r)
+                .sort((a, b) => b.total - a.total);
+
               return (
                 <div className="space-y-2 mb-4">
-                  {[...detailMatch.playerScores]
-                    .filter(ps => shownPlayers.includes(ps.playerId))
-                    .sort((a, b) => (b.total || 0) - (a.total || 0))
-                    .map((ps, idx) => {
-                      const player = players.find(p => p.id === ps.playerId);
-                      if (!player) return null;
-
-                      return (
-                        <div key={ps.playerId} className={cn('rounded-2xl p-3 border', ps.playerId === detailMatch.winnerId ? 'bg-amber-50 border-amber-200' : 'bg-secondary border-border')}>
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-lg">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}</span>
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                              style={{ backgroundColor: player.color }}>
-                              {player.name.charAt(0).toUpperCase()}
-                            </div>
-                            <span className="text-foreground font-bold text-sm flex-1">{player.name}</span>
-                            <span className="text-lg font-black text-foreground">
-                              {ps.specialVictory ? `⚡ ${ps.specialVictory}` : ps.total}
-                            </span>
-                          </div>
-
-                          {draftGame.scoringTemplate.type === 'complex' && !ps.specialVictory && (
-                            <div className="grid grid-cols-3 gap-1">
-                              {cats.map(cat => (
-                                <div key={cat.id} className="text-center">
-                                  <span className="text-[10px] text-muted-foreground block truncate">{cat.name}</span>
-                                  {editDraft ? (
-                                    <input type="number" inputMode="numeric"
-                                      value={editDraft.scores[ps.playerId]?.[cat.id] ?? 0}
-                                      onChange={e => setDraftScore(ps.playerId, cat.id, parseInt(e.target.value) || 0)}
-                                      className="w-full input-field text-center px-1 py-1 text-xs" />
-                                  ) : (
-                                    <span className="text-xs text-foreground font-bold">{ps.scores[cat.id] || 0}</span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {draftGame.scoringTemplate.type === 'simple' && editDraft && (
-                            <input type="number" inputMode="numeric"
-                              value={editDraft.scores[ps.playerId]?.['total'] ?? ''}
-                              onChange={e => setDraftScore(ps.playerId, 'total', parseInt(e.target.value) || 0)}
-                              placeholder="Puntuación total"
-                              className="input-field text-center text-sm py-2" />
-                          )}
+                  {rows.map((row, idx) => (
+                    <div key={row.playerId} className={cn('rounded-2xl p-3 border', row.playerId === currentWinnerId ? 'bg-amber-50 border-amber-200' : 'bg-secondary border-border')}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}</span>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                          style={{ backgroundColor: row.player.color }}>
+                          {row.player.name.charAt(0).toUpperCase()}
                         </div>
-                      );
-                    })}
+                        <span className="text-foreground font-bold text-sm flex-1">{row.player.name}</span>
+                        <span className="text-lg font-black text-foreground">
+                          {row.specialVictory ? `⚡ ${row.specialVictory}` : row.total}
+                        </span>
+                      </div>
+
+                      {draftGame.scoringTemplate.type === 'complex' && !row.specialVictory && (
+                        <div className="grid grid-cols-3 gap-1">
+                          {cats.map(cat => (
+                            <div key={cat.id} className="text-center">
+                              <span className="text-[10px] text-muted-foreground block truncate">{cat.name}</span>
+                              {editDraft ? (
+                                <input type="number" inputMode="numeric"
+                                  value={editDraft.scores[row.playerId]?.[cat.id] ?? 0}
+                                  onChange={e => setDraftScore(row.playerId, cat.id, parseInt(e.target.value) || 0)}
+                                  className="w-full input-field text-center px-1 py-1 text-xs" />
+                              ) : (
+                                <span className="text-xs text-foreground font-bold">{row.scores[cat.id] || 0}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {draftGame.scoringTemplate.type === 'simple' && editDraft && (
+                        <input type="number" inputMode="numeric"
+                          value={editDraft.scores[row.playerId]?.['total'] ?? ''}
+                          onChange={e => setDraftScore(row.playerId, 'total', parseInt(e.target.value) || 0)}
+                          placeholder="Puntuación total"
+                          className="input-field text-center text-sm py-2" />
+                      )}
+                    </div>
+                  ))}
                 </div>
               );
             })()}
@@ -632,8 +663,13 @@ function DuelPadReadonly({
 
   const headerStyle = getDuelPadRowStyle('wonder_header');
 
+  // Ancho mínimo por columna + scroll horizontal con muchos jugadores.
+  const tableMinWidth = `${150 + matchPlayers.length * 72}px`;
+
   return (
     <div className="overflow-hidden rounded-2xl border border-black/20 mb-4">
+      <div className="overflow-x-auto">
+        <div style={{ minWidth: tableMinWidth }}>
       <div
         className="grid items-stretch border-b-2 border-black/40"
         style={{
@@ -755,6 +791,8 @@ function DuelPadReadonly({
           </div>
         );
       })}
+        </div>
+      </div>
     </div>
   );
 }

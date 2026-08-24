@@ -7,6 +7,7 @@ import { v4 as uuid } from 'uuid';
 import { cn } from '../utils/cn';
 import { GameCover } from './GameCover';
 import { buildDuelPadCategories } from '../utils/duelPad';
+import { useModalLock } from '../utils/useModalLock';
 
 const ALL_TYPES: GameType[] = ['Estrategia', 'Cartas', 'Filler', 'Cooperativo', 'Dados', 'Puzzle', 'Construcción', 'Negociación', 'Destreza', 'Familiar', 'Abstracto', 'Duel'];
 
@@ -74,6 +75,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // ---- Game Form ----
 function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => void }) {
   const { games, addGame, updateGame } = useStore();
+  useModalLock(true);
   const [name, setName] = useState(gameToEdit?.name || '');
   const [imageUrl, setImageUrl] = useState(gameToEdit?.imageUrl || '');
   const [types, setTypes] = useState<GameType[]>(gameToEdit?.types || []);
@@ -265,7 +267,6 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
                       <option value="wonder_comercio">7WD · Verde</option>
                       <option value="wonder_recurso">7WD · Amarilla</option>
                       <option value="wonder_gremio">7WD · Morada</option>
-                      <option value="maravilla">7WD · Etapa</option>
                       <option value="wonder_moneda">7WD · Moneda V</option>
                       <option value="wonder_derrota">7WD · Derrota</option>
                       <option value="wonder_militar">7WD · Militar</option>
@@ -332,6 +333,7 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
 // ---- Game Detail (estilo álbum) ----
 function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
   const { games, matches, players, deleteGame, setEditingGameId, setShowGameForm, toggleFavorite, setTab, setSelectedGameId } = useStore();
+  useModalLock(true);
   const expansions = games.filter(g => g.baseGameId === game.id);
   const baseGame = game.isExpansion ? games.find(g => g.id === game.baseGameId) : null;
   const gameMatches = matches.filter(m => m.gameId === game.id);

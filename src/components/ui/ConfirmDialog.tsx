@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Button } from './button';
+import { useModalLock } from '../../utils/useModalLock';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -22,6 +23,8 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  useModalLock(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
