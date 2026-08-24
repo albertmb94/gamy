@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Button } from './button';
+import { ModalOverlay } from './ModalOverlay';
 import { useModalLock } from '../../utils/useModalLock';
 
 export interface ConfirmDialogProps {
@@ -37,7 +38,7 @@ export function ConfirmDialog({
   if (!open) return null;
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    <ModalOverlay onClick={onCancel} top>
       <div className="modal-panel p-5" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-semibold tracking-tight mb-2">{title}</h2>
         {description && (
@@ -55,6 +56,6 @@ export function ConfirmDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

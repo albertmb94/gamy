@@ -8,6 +8,7 @@ import { cn } from '../utils/cn';
 import { GameCover } from './GameCover';
 import { buildDuelPadCategories } from '../utils/duelPad';
 import { useModalLock } from '../utils/useModalLock';
+import { ModalOverlay } from './ui/ModalOverlay';
 
 const ALL_TYPES: GameType[] = ['Estrategia', 'Cartas', 'Filler', 'Cooperativo', 'Dados', 'Puzzle', 'Construcción', 'Negociación', 'Destreza', 'Familiar', 'Abstracto', 'Duel'];
 
@@ -159,7 +160,7 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <ModalOverlay onClick={onClose}>
       <div className="modal-panel p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold text-foreground">{gameToEdit ? 'Editar Juego' : 'Nuevo Juego'}</h2>
@@ -326,7 +327,7 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -357,7 +358,7 @@ function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <ModalOverlay onClick={onClose}>
       <div className="modal-panel overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Cabecera estilo "Album detail" de la imagen */}
         <div className="px-5 pt-4 pb-5 flex items-center justify-between">
@@ -472,7 +473,7 @@ function GameDetail({ game, onClose }: { game: Game; onClose: () => void }) {
           </div>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

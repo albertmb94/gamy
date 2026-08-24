@@ -5,6 +5,7 @@ import { useRemigioStore } from '../store/useRemigioStore';
 import { statusLabel } from '../remigio/engine';
 import { cn } from '../utils/cn';
 import { useModalLock } from '../utils/useModalLock';
+import { ModalOverlay } from './ui/ModalOverlay';
 import { Game, Player, PlayerScore, ScoreCategory } from '../types';
 import {
   DUEL_PAD_EXCLUDED_METADATA,
@@ -266,9 +267,10 @@ export default function History() {
         </div>
       )}
 
-      {/* Match Detail Modal */}
+      {/* Match Detail Modal — portal a <body> para que position:fixed no lo
+          ancle al contenido scrolleado (bug iOS/WebKit). */}
       {detailMatch && detailGame && (
-        <div className="modal-overlay" onClick={closeDetail}>
+        <ModalOverlay onClick={closeDetail}>
           <div className="modal-panel p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <button onClick={closeDetail}
@@ -544,7 +546,7 @@ export default function History() {
               )}
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );
@@ -663,8 +665,8 @@ function DuelPadReadonly({
 
   const headerStyle = getDuelPadRowStyle('wonder_header');
 
-  // Ancho mínimo por columna + scroll horizontal con muchos jugadores.
-  const tableMinWidth = `${150 + matchPlayers.length * 72}px`;
+  // Ancho mínimo por columna + scroll horizontal solo con muchos jugadores.
+  const tableMinWidth = `${90 + matchPlayers.length * 64}px`;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-black/20 mb-4">

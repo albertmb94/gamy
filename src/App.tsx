@@ -34,6 +34,12 @@ export default function App() {
     if (dbStatus === 'connected') syncRemigio();
   }, [dbStatus, syncRemigio]);
 
+  // Al cambiar de pestaña, el scroll vuelve arriba: si no, el scroll heredado
+  // dejaba el título de la sección debajo del header sticky (transparente).
+  useEffect(() => {
+    document.getElementById('root')?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [currentTab]);
+
   const tabContent = () => {
     switch (currentTab) {
       case 'library': return <Library />;
@@ -47,8 +53,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
-      {/* Header — estilo "Now Playing" del reproductor */}
-      <header className="sticky top-0 z-40 px-4 pt-3 pb-2.5 flex items-center justify-between">
+      {/* Header — estilo "Now Playing" del reproductor. Con fondo + blur:
+          sin él, el contenido scrolleado se ve a través y se solapa con el
+          título ("partes flotando"). */}
+      <header className="sticky top-0 z-40 px-4 pt-3 pb-2.5 flex items-center justify-between bg-background/85 backdrop-blur-md">
         <button className="w-9 h-9 rounded-full bg-card border border-border flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors">
           <ChevronDown className="h-5 w-5" />
         </button>

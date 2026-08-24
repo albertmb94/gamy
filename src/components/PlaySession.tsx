@@ -81,9 +81,10 @@ function DuelPadScorepad({
 
   const headerStyle = getDuelPadRowStyle('wonder_header');
 
-  // Con 3+ jugadores en pantallas estrechas la tabla se aplasta: se fuerza un
-  // ancho mínimo por columna y se permite scroll horizontal.
-  const tableMinWidth = `${150 + selectedPlayers.length * 72}px`;
+  // Con 4+ jugadores en pantallas estrechas la tabla se aplasta: se fuerza un
+  // ancho mínimo por columna y se permite scroll horizontal. Con 2-3 la tabla
+  // cabe sin scroll (col etiqueta ~90px + ~64px por jugador).
+  const tableMinWidth = `${90 + selectedPlayers.length * 64}px`;
 
   return (
     <div className="glass-card overflow-hidden">

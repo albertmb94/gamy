@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Spade, Settings as SettingsIcon, ChevronDown } from 'lucide-react';
 import { useRemigioStore } from '../store/useRemigioStore';
 import { RemigioList } from './screens/RemigioList';
@@ -7,6 +8,14 @@ import { RemigioSettings } from './screens/RemigioSettings';
 
 export function RemigioModule() {
   const { open, screen, activeSessionId, closeModule, goSettings } = useRemigioStore();
+  const mainRef = useRef<HTMLElement>(null);
+
+  // Al cambiar de pantalla dentro del módulo, el scroll vuelve arriba para
+  // que el header sticky (ahora con fondo) no solape contenido viejo.
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [screen, activeSessionId]);
+
   if (!open) return null;
 
   const showSettingsButton = screen === 'list' || screen === 'new';
@@ -19,8 +28,8 @@ export function RemigioModule() {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-background flex flex-col">
-      <header className="sticky top-0 z-10 px-4 pt-3 pb-2.5 flex items-center justify-between">
+    <div className="fixed inset-0 z-[80] bg-background flex flex-col">
+      <header className="sticky top-0 z-10 px-4 pt-3 pb-2.5 flex items-center justify-between bg-background/85 backdrop-blur-md">
         <button
           onClick={closeModule}
           className="w-9 h-9 rounded-full bg-card border border-border text-foreground flex items-center justify-center"
@@ -49,7 +58,7 @@ export function RemigioModule() {
         )}
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 pt-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+      <main ref={mainRef} className="flex-1 overflow-y-auto px-4 pt-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
         <div className="max-w-3xl mx-auto animate-fade-in">
           {screen === 'list' && <RemigioList />}
           {screen === 'new' && <RemigioNew />}
