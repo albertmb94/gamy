@@ -25,3 +25,7 @@ yarn-error.log*
 
 # Copia de referencia del repo brisca-app (no forma parte del repo de ludotic)
 brisca-app/
+
+# Imágenes de referencia sueltas en la raíz (no usadas por la app)
+/7wonders.jpeg
+/gamy.webp
