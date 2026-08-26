@@ -125,23 +125,9 @@ export function applyRound(
     (p) => p.status === 'active' && p.current_score > targetScore,
   );
 
-  for (const player of overTarget) {
-    if (alivePlayers.length >= 2) {
-      const maxAliveScore = Math.max(...alivePlayers.map((p) => p.current_score));
-      player.current_score = maxAliveScore;
-      player.reentry_count += 1;
-    } else {
-      player.status = 'eliminated';
-    }
-  }
-
-  // Verificar victoria: queda 1 jugador activo dentro del objetivo.
-  const finalAlive = session.players.filter(
-    (p) => p.current_score <= targetScore && p.status === 'active',
-  );
-
-  if (finalAlive.length === 1) {
-    const winnerPlayer = finalAlive[0];
+  // Liquida la partida a favor del jugador indicado: pagos de partida y
+  // reenganches del resto.
+  const settleWinner = (winnerPlayer: RemigioPlayer) => {
     winnerPlayer.status = 'winner';
     session.status = 'finished';
     session.ended_at = new Date().toISOString();
@@ -167,6 +153,35 @@ export function applyRound(
           created_at: new Date().toISOString(),
         });
       }
+    }
+  };
+
+  if (overTarget.length > 0 && alivePlayers.length === 0) {
+    // Caso límite: TODOS los activos se pasan del objetivo en la misma ronda.
+    // Eliminarlos a todos dejaría una partida zombi sin ganador ni salida por
+    // UI, así que gana quien tenga MENOS puntos acumulados y se finaliza.
+    const bestPlayer = overTarget.reduce((min, p) =>
+      p.current_score < min.current_score ? p : min,
+    );
+    settleWinner(bestPlayer);
+  } else {
+    for (const player of overTarget) {
+      if (alivePlayers.length >= 2) {
+        const maxAliveScore = Math.max(...alivePlayers.map((p) => p.current_score));
+        player.current_score = maxAliveScore;
+        player.reentry_count += 1;
+      } else {
+        player.status = 'eliminated';
+      }
+    }
+
+    // Verificar victoria: queda 1 jugador activo dentro del objetivo.
+    const finalAlive = session.players.filter(
+      (p) => p.current_score <= targetScore && p.status === 'active',
+    );
+
+    if (finalAlive.length === 1) {
+      settleWinner(finalAlive[0]);
     }
   }
 

@@ -60,6 +60,8 @@ export interface Game {
   duration?: number; // in minutes
   isFavorite?: boolean;
   createdAt: string;
+  /** Última modificación; resuelve conflictos en la sincronización (LWW). */
+  updatedAt?: string;
 }
 
 export interface Player {
@@ -68,6 +70,8 @@ export interface Player {
   avatar?: string;
   color: string;
   createdAt: string;
+  /** Última modificación; resuelve conflictos en la sincronización (LWW). */
+  updatedAt?: string;
 }
 
 export interface PlayerScore {
@@ -88,6 +92,8 @@ export interface MatchRecord {
   firstPlayerId?: string;
   synced: boolean;
   createdAt: string;
+  /** Última modificación; resuelve conflictos en la sincronización (LWW). */
+  updatedAt?: string;
 }
 
 export interface Achievement {

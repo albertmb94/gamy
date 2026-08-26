@@ -9,7 +9,7 @@ import {
   getRemigioTombstones,
   setRemigioTombstones,
 } from '../db/localDb';
-import { syncItemToRemote, fetchRemoteRemigio } from '../db/turso';
+import { syncItemToRemote, fetchRemoteRemigio, normalizeSessionDates } from '../db/turso';
 import { remigioSeed } from '../remigio/seed';
 
 export type RemigioScreen = 'list' | 'new' | 'session' | 'settings';
@@ -46,6 +46,10 @@ function sortByDate(sessions: RemigioSession[]) {
 }
 
 export const useRemigioStore = create<RemigioState>()((set, get) => {
+  // Mutex: evita doble sincronización simultánea (load() y el efecto de App
+  // pueden invocar syncAll casi al mismo tiempo).
+  let syncing = false;
+
   // Persiste localmente y sube a Turso en tiempo real. Al confirmar la subida
   // marca la partida como sincronizada (synced) tanto en memoria como en local.
   const persistAndPush = (session: RemigioSession) => {
@@ -63,6 +67,42 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
       .catch(() => {/* offline: queda synced:false y se reintenta en syncAll */});
   };
 
+  const doSyncAll = async () => {
+    const tombstones = new Set(await getRemigioTombstones());
+    const remote = await fetchRemoteRemigio();
+    if (remote === null) {
+      // Fallo de red/credenciales: NO confundir con remoto vacío. Se
+      // conservan el estado local y los pendientes para reintentar después.
+      return;
+    }
+
+    const byId = new Map<string, RemigioSession>();
+    get().sessions.forEach((s) => byId.set(s.id, s));
+    for (const r of remote) {
+      if (tombstones.has(r.id)) continue; // borrada localmente, no resucitar
+      const local = byId.get(r.id);
+      if (!local || ts(r) > ts(local)) byId.set(r.id, r);
+    }
+
+    const merged = sortByDate([...byId.values()]);
+    set({ sessions: merged });
+    await Promise.all(merged.map((s) => saveRemigioSession(s).catch(() => {})));
+
+    // Subir partidas locales aún no sincronizadas.
+    const pending = merged.filter((s) => !s.synced);
+    await Promise.all(pending.map((s) => persistAndPush(s)));
+
+    // Reintentar borrados pendientes.
+    if (tombstones.size > 0) {
+      const stillPending: string[] = [];
+      for (const id of tombstones) {
+        const ok = await syncItemToRemote('remigio', { id }, true).catch(() => false);
+        if (!ok) stillPending.push(id);
+      }
+      await setRemigioTombstones(stillPending);
+    }
+  };
+
   return {
     sessions: [],
     hydrated: false,
@@ -72,8 +112,14 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
 
     load: async () => {
       // Importa (una sola vez) las partidas históricas migradas de brisca-app.
-      await importRemigioSeedOnce(remigioSeed).catch((e) => console.error('Error importing remigio seed:', e));
-      const sessions = sortByDate(await loadRemigioSessions());
+      // Las fechas se normalizan a ISO porque el seed contiene valores sin zona.
+      await importRemigioSeedOnce(remigioSeed.map(normalizeSessionDates)).catch((e) =>
+        console.error('Error importing remigio seed:', e)
+      );
+      // La carga también normaliza: instalações previas ya tienen fechas
+      // legacy guardadas en IndexedDB.
+      const loaded = await loadRemigioSessions();
+      const sessions = sortByDate(loaded.map(normalizeSessionDates));
       set({ sessions, hydrated: true });
       // Sincroniza con Turso (pull + push) sin bloquear el render inicial.
       get().syncAll();
@@ -82,33 +128,12 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
     // Sincronización bidireccional con Turso: descarga lo remoto, fusiona por
     // last-write-wins (updated_at) y sube lo local pendiente y los borrados.
     syncAll: async () => {
-      const tombstones = new Set(await getRemigioTombstones());
-      const remote = await fetchRemoteRemigio();
-
-      const byId = new Map<string, RemigioSession>();
-      get().sessions.forEach((s) => byId.set(s.id, s));
-      for (const r of remote) {
-        if (tombstones.has(r.id)) continue; // borrada localmente, no resucitar
-        const local = byId.get(r.id);
-        if (!local || ts(r) > ts(local)) byId.set(r.id, r);
-      }
-
-      const merged = sortByDate([...byId.values()]);
-      set({ sessions: merged });
-      await Promise.all(merged.map((s) => saveRemigioSession(s).catch(() => {})));
-
-      // Subir partidas locales aún no sincronizadas.
-      const pending = merged.filter((s) => !s.synced);
-      await Promise.all(pending.map((s) => persistAndPush(s)));
-
-      // Reintentar borrados pendientes.
-      if (tombstones.size > 0) {
-        const stillPending: string[] = [];
-        for (const id of tombstones) {
-          const ok = await syncItemToRemote('remigio', { id }, true).catch(() => false);
-          if (!ok) stillPending.push(id);
-        }
-        await setRemigioTombstones(stillPending);
+      if (syncing) return;
+      syncing = true;
+      try {
+        await doSyncAll();
+      } finally {
+        syncing = false;
       }
     },
 
@@ -131,8 +156,11 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
       set((s) => {
         const sessions = s.sessions.map((sess) => {
           if (sess.id !== sessionId) return sess;
-          updated = applyRound(sess, points);
-          return updated;
+          const next = applyRound(sess, points);
+          // applyRound puede devolver un clon sin cambios (ronda sin
+          // activos): solo persistimos si realmente cambió algo.
+          if (next !== sess) updated = next;
+          return next;
         });
         return { sessions };
       });
@@ -144,8 +172,10 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
       set((s) => {
         const sessions = s.sessions.map((sess) => {
           if (sess.id !== sessionId) return sess;
-          updated = editLastRound(sess, points);
-          return updated;
+          if (sess.rounds.length === 0) return sess; // nada que editar
+          const next = editLastRound(sess, points);
+          if (next !== sess) updated = next;
+          return next;
         });
         return { sessions };
       });
@@ -172,18 +202,25 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
         screen: s.activeSessionId === id ? 'list' : s.screen,
       }));
       deleteRemigioSession(id).catch((e) => console.error('Error deleting remigio session:', e));
-      // Borrado remoto en tiempo real; si falla (offline), se deja tombstone.
-      syncItemToRemote('remigio', { id }, true)
-        .then(async (ok) => {
-          if (!ok) {
-            const t = await getRemigioTombstones();
-            if (!t.includes(id)) await setRemigioTombstones([...t, id]);
-          }
-        })
-        .catch(async () => {
+      // Tombstone SIEMPRE y permanente: aunque el borrado remoto tenga éxito,
+      // otro dispositivo que aún tenga la partida podría subirla de nuevo en
+      // su próximo push. El tombstone evita resurrecciones (y el ping-pong de
+      // borrar/subir). Los ids son uuid, así que una partida nueva legítima
+      // nunca colisiona con un tombstone.
+      const addTombstone = async () => {
+        try {
           const t = await getRemigioTombstones();
           if (!t.includes(id)) await setRemigioTombstones([...t, id]);
-        });
+        } catch (e) {
+          console.error('Error registering tombstone:', e);
+        }
+      };
+      addTombstone();
+      syncItemToRemote('remigio', { id }, true)
+        .then((ok) => {
+          if (!ok) {/* el tombstone ya está registrado; se reintenta en syncAll */}
+        })
+        .catch(() => {/* offline: idem */});
     },
   };
 });

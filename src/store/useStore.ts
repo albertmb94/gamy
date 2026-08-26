@@ -10,12 +10,14 @@ import {
   deleteGame as deleteGameDb,
   deletePlayer as deletePlayerDb,
   deleteMatch as deleteMatchDb,
+  deleteAchievement as deleteAchievementDb,
   getSyncQueue,
   clearSyncItem,
   importGamesSeedOnce,
   migrateDuelPadObsoleteCategories,
   migrateDuelPadMilitar,
   migrateDuelPadCategoriesV4,
+  SyncQueueItem,
 } from '../db/localDb';
 import { syncItemToRemote, checkRemoteConnection, fetchRemoteState } from '../db/turso';
 import { gamesSeed } from '../utils/gamesSeed';
@@ -46,7 +48,8 @@ interface AppState {
 
   // Games
   addGame: (game: Omit<Game, 'id' | 'createdAt' | 'expansionIds'> & { expansionIds?: string[] }) => string;
-  updateGame: (id: string, updates: Partial<Game>) => void;
+  /** Devuelve false si el rename colisiona con otro juego existente. */
+  updateGame: (id: string, updates: Partial<Game>) => boolean;
   deleteGame: (id: string) => void;
   toggleFavorite: (id: string) => void;
   setSelectedGameId: (id: string | null) => void;
@@ -55,7 +58,8 @@ interface AppState {
 
   // Players
   addPlayer: (name: string, color: string) => string;
-  updatePlayer: (id: string, updates: Partial<Player>) => void;
+  /** Devuelve false si el rename colisiona con otro jugador existente. */
+  updatePlayer: (id: string, updates: Partial<Player>) => boolean;
   deletePlayer: (id: string) => void;
 
   // Matches
@@ -87,13 +91,21 @@ function normName(s: string): string {
   return (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+interface DedupResult<T> {
+  kept: T[];
+  /** Mapa id eliminado → id conservado, para reasignar referencias (partidas). */
+  reassignments: Map<string, string>;
+}
+
 // Deduplica por nombre (case-insensitive). Si hay varios con el mismo nombre,
-// se queda con el de createdAt más reciente. Devuelve { kept, removedIds }.
+// se queda con el de createdAt más reciente y devuelve el mapa de
+// reasignación para que las partidas/logros del duplicado eliminado pasen a
+// apuntar al conservado en vez de perderse.
 function deduplicateByName<T extends { id: string; name: string; createdAt: string }>(
   items: T[]
-): { kept: T[]; removedIds: string[] } {
+): DedupResult<T> {
   const byKey = new Map<string, T>();
-  const removedIds: string[] = [];
+  const reassignments = new Map<string, string>();
   for (const item of items) {
     const key = normName(item.name);
     if (!key) {
@@ -108,14 +120,55 @@ function deduplicateByName<T extends { id: string; name: string; createdAt: stri
       const existingTime = new Date(existing.createdAt).getTime();
       const itemTime = new Date(item.createdAt).getTime();
       if (itemTime > existingTime) {
-        removedIds.push(existing.id);
+        reassignments.set(existing.id, item.id);
         byKey.set(key, item);
       } else {
-        removedIds.push(item.id);
+        reassignments.set(item.id, existing.id);
       }
     }
   }
-  return { kept: Array.from(byKey.values()), removedIds };
+  return { kept: Array.from(byKey.values()), reassignments };
+}
+
+/**
+ * Reasigna partidas y logros de los duplicados eliminados hacia los
+ * conservados. Mutación en memoria; el llamador decide cómo persistir.
+ */
+function remapReferences(
+  matches: MatchRecord[],
+  achievements: PlayerAchievement[],
+  gameRemaps: Map<string, string>,
+  playerRemaps: Map<string, string>
+): { matches: MatchRecord[]; achievements: PlayerAchievement[] } {
+  const remappedMatches = matches.map(m => {
+    const gameId = gameRemaps.get(m.gameId) ?? m.gameId;
+    let changed = gameRemaps.has(m.gameId);
+    const playerIds = m.playerIds.map(pid => {
+      const npid = playerRemaps.get(pid) ?? pid;
+      if (npid !== pid) changed = true;
+      return npid;
+    });
+    // Tras fusionar jugadores puede haber ids duplicados en la partida.
+    const uniquePlayerIds = Array.from(new Set(playerIds));
+    if (!changed && uniquePlayerIds.length === playerIds.length) return m;
+    return { ...m, gameId, playerIds: uniquePlayerIds };
+  });
+  const remappedAchievements = achievements.map(a => {
+    const playerId = playerRemaps.get(a.playerId) ?? a.playerId;
+    if (playerId === a.playerId) return a;
+    return { ...a, playerId };
+  });
+  return { matches: remappedMatches, achievements: remappedAchievements };
+}
+
+/** Marca el instante de la última modificación para la resolución LWW. */
+function touch(): string {
+  return new Date().toISOString();
+}
+
+/** Type guard: entradas de cola nuevas incluyen snapshot del recurso. */
+function isSyncQueueWithPayload(item: SyncQueueItem): boolean {
+  return typeof item.payload !== 'undefined' && item.payload !== null;
 }
 
 export const useStore = create<AppState>()((set, get) => ({
@@ -166,31 +219,54 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   updateGame: (id, updates) => {
+    // Validación: no permitir renombrar a un nombre ya ocupado por otro juego.
+    if (typeof updates.name === 'string') {
+      const incoming = normName(updates.name);
+      const collides = incoming && get().games.some(g => g.id !== id && normName(g.name) === incoming);
+      if (collides) return false;
+    }
     set((s) => {
-      const games = s.games.map(g => g.id === id ? { ...g, ...updates } : g);
+      const games = s.games.map(g => g.id === id ? { ...g, ...updates, updatedAt: touch() } : g);
       const updated = games.find(g => g.id === id);
       if (updated) saveGame(updated).catch(e => console.error('Error saving game:', e));
       return { games };
     });
+    return true;
   },
 
   deleteGame: (id) => {
     set((s) => {
       const game = s.games.find(g => g.id === id);
-      let games = s.games.filter(g => g.id !== id);
+      // Expansiones que cuelgan del juego base eliminado.
+      const expansionIds = !game?.isExpansion
+        ? s.games.filter(g => g.baseGameId === id).map(g => g.id)
+        : [];
+      const affectedGameIds = new Set([id, ...expansionIds]);
+
+      // Cascada de partidas: se eliminan Y encolan para borrarlas también
+      // del remoto (si no, syncFromRemote las resucitaría).
+      const removedMatches = s.matches.filter(m => affectedGameIds.has(m.gameId));
+
+      let games = s.games.filter(g => !affectedGameIds.has(g.id));
+      // Si borrábamos una expansión, quitar su id de la lista del juego base
+      // (única fila que cambia; no re-persistir todo el catálogo).
+      let changedBase: Game | undefined;
       if (game?.isExpansion && game.baseGameId) {
-        games = games.map(g => g.id === game.baseGameId
-          ? { ...g, expansionIds: g.expansionIds.filter(eid => eid !== id) }
-          : g
-        );
+        games = games.map(g => {
+          if (g.id !== game.baseGameId) return g;
+          changedBase = { ...g, expansionIds: g.expansionIds.filter(eid => eid !== id), updatedAt: touch() };
+          return changedBase;
+        });
       }
-      if (!game?.isExpansion) {
-        games = games.filter(g => g.baseGameId !== id);
-      }
-      const nextGames = games.map(g => ({ ...g }));
-      nextGames.forEach(g => saveGame(g).catch(e => console.error(e)));
-      deleteGameDb(id).catch(e => console.error('Error deleting game:', e));
-      return { games: nextGames, matches: s.matches.filter(m => m.gameId !== id) };
+
+      // Persistencia + encolado de TODA la cascada.
+      affectedGameIds.forEach(gid => deleteGameDb(gid).catch(e => console.error('Error deleting game:', e)));
+      removedMatches.forEach(m => deleteMatchDb(m.id).catch(e => console.error('Error deleting match:', e)));
+      if (changedBase) saveGame(changedBase).catch(e => console.error('Error saving game:', e));
+      return {
+        games,
+        matches: s.matches.filter(m => !affectedGameIds.has(m.gameId)),
+      };
     });
   },
 
@@ -200,7 +276,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   toggleFavorite: (id) => {
     set((s) => {
-      const games = s.games.map(g => g.id === id ? { ...g, isFavorite: !g.isFavorite } : g);
+      const games = s.games.map(g => g.id === id ? { ...g, isFavorite: !g.isFavorite, updatedAt: touch() } : g);
       const updated = games.find(g => g.id === id);
       if (updated) saveGame(updated).catch(e => console.error('Error saving game:', e));
       return { games };
@@ -226,29 +302,51 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   updatePlayer: (id, updates) => {
+    // Validación: no permitir renombrar a un nombre ya ocupado por otro jugador.
+    if (typeof updates.name === 'string') {
+      const incoming = normName(updates.name);
+      const collides = incoming && get().players.some(p => p.id !== id && normName(p.name) === incoming);
+      if (collides) return false;
+    }
     set((s) => {
-      const players = s.players.map(p => p.id === id ? { ...p, ...updates } : p);
+      const players = s.players.map(p => p.id === id ? { ...p, ...updates, updatedAt: touch() } : p);
       const updated = players.find(p => p.id === id);
       if (updated) savePlayer(updated).catch(e => console.error('Error saving player:', e));
       return { players };
     });
+    return true;
   },
 
   deletePlayer: (id) => {
-    set((s) => ({
-      players: s.players.filter(p => p.id !== id),
-      matches: s.matches.filter(m => !m.playerIds.includes(id)),
-    }));
-    deletePlayerDb(id).catch(e => console.error('Error deleting player:', e));
+    set((s) => {
+      // Cascada: partidas del jugador y sus logros. Todo se encola para
+      // propagar los borrados al remoto y evitar resurrecciones.
+      const removedMatches = s.matches.filter(m => m.playerIds.includes(id));
+      const removedAchievements = s.playerAchievements.filter(a => a.playerId === id);
+
+      deletePlayerDb(id).catch(e => console.error('Error deleting player:', e));
+      removedMatches.forEach(m => deleteMatchDb(m.id).catch(e => console.error('Error deleting match:', e)));
+      removedAchievements.forEach(a =>
+        deleteAchievementDb(a.achievementId, a.playerId).catch(e => console.error('Error deleting achievement:', e))
+      );
+
+      return {
+        players: s.players.filter(p => p.id !== id),
+        matches: s.matches.filter(m => !m.playerIds.includes(id)),
+        playerAchievements: s.playerAchievements.filter(a => a.playerId !== id),
+      };
+    });
   },
 
   addMatch: (matchData) => {
     const id = uuid();
+    const now = new Date().toISOString();
     const match: MatchRecord = {
       ...matchData,
       id,
       synced: false,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
     set((s) => ({
       matches: [...s.matches, match],
@@ -262,7 +360,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   updateMatch: (id, updates) => {
     set((s) => {
-      const matches = s.matches.map(m => m.id === id ? { ...m, ...updates, synced: false } : m);
+      const matches = s.matches.map(m => m.id === id ? { ...m, ...updates, synced: false, updatedAt: touch() } : m);
       const updated = matches.find(m => m.id === id);
       if (updated) saveMatch(updated).then(() => get().refreshPendingSync()).catch(e => console.error(e));
       return { matches };
@@ -376,42 +474,48 @@ export const useStore = create<AppState>()((set, get) => ({
     const originalQueue = await getSyncQueue();
     const queuedIds = new Set(originalQueue.map(q => q.id));
 
-    const { kept: cleanGames, removedIds: removedGameIds } = deduplicateByName(loaded.games);
-    const { kept: cleanPlayers, removedIds: removedPlayerIds } = deduplicateByName(loaded.players);
+    // Deduplicación por nombre conservando el registro más reciente. Las
+    // partidas/logros del duplicado eliminado se REASIGNAN al conservado
+    // (no se pierden).
+    const { kept: cleanGames, reassignments: gameRemaps } = deduplicateByName(loaded.games);
+    const { kept: cleanPlayers, reassignments: playerRemaps } = deduplicateByName(loaded.players);
+    const removedGameIds = Array.from(gameRemaps.keys());
+    const removedPlayerIds = Array.from(playerRemaps.keys());
 
-    // Partidas y logros que referencian registros eliminados también se purgan
-    const cleanMatches = loaded.matches.filter(m =>
-      !removedGameIds.includes(m.gameId) &&
-      !m.playerIds.some(pid => removedPlayerIds.includes(pid))
-    );
-    const removedMatchIds = loaded.matches
-      .filter(m => !cleanMatches.find(c => c.id === m.id))
-      .map(m => m.id);
-    const cleanAchievements = loaded.playerAchievements.filter(
-      a => !removedPlayerIds.includes(a.playerId)
+    const { matches: cleanMatches, achievements: cleanAchievements } = remapReferences(
+      loaded.matches,
+      loaded.playerAchievements,
+      gameRemaps,
+      playerRemaps,
     );
 
-    // Persistir la limpieza en IndexedDB. deleteGameDb/deletePlayerDb/
-    // deleteMatchDb añaden entradas de borrado a la cola de sync, que
-    // posteriormente se subirán al remoto para limpiar duplicados allí.
+    // Persistir la limpieza en IndexedDB. deleteGameDb/deletePlayerDb
+    // añaden entradas de borrado a la cola de sync que se subirán al remoto.
     await Promise.all([
       ...removedGameIds.map(id => deleteGameDb(id)),
       ...removedPlayerIds.map(id => deletePlayerDb(id)),
-      ...removedMatchIds.map(id => deleteMatchDb(id)),
     ]);
 
-    // Si había duplicados, los registros conservados podrían no estar en la
-    // cola. Los reencolamos para asegurar que el remoto termina consistente
-    // (al menos uno por nombre). Si ya estaban en cola, save* hace put y no
-    // duplica la entrada.
     const hadDupes = removedGameIds.length > 0 || removedPlayerIds.length > 0;
     if (hadDupes) {
+      // Reencolar los registros conservados y las referencias reasignadas
+      // para que el remoto termine consistente (un registro por nombre y
+      // partidas apuntando al id conservado).
       const toQueue: Promise<void>[] = [];
       for (const g of cleanGames) {
         if (!queuedIds.has(`game:${g.id}`)) toQueue.push(saveGame(g));
       }
       for (const p of cleanPlayers) {
         if (!queuedIds.has(`player:${p.id}`)) toQueue.push(savePlayer(p));
+      }
+      for (let i = 0; i < cleanMatches.length; i++) {
+        // Solo re-encolar las partidas cuya referencia cambió.
+        if (cleanMatches[i] !== loaded.matches[i]) toQueue.push(saveMatch(cleanMatches[i]));
+      }
+      for (let i = 0; i < cleanAchievements.length; i++) {
+        if (cleanAchievements[i] !== loaded.playerAchievements[i]) {
+          toQueue.push(saveAchievement(cleanAchievements[i]));
+        }
       }
       await Promise.all(toQueue);
     }
@@ -442,9 +546,9 @@ export const useStore = create<AppState>()((set, get) => ({
   syncPendingItems: async () => {
     const { matches, players, games, playerAchievements } = get();
     const queue = await getSyncQueue();
-    console.log('[syncPendingItems] full queue:', queue.map(q => ({ id: q.id, type: q.type, updatedAt: q.updatedAt })));
 
-    // Ordenar: primero deletes, luego inserts/updates, y dentro de cada grupo por fecha
+    // Ordenar por fecha de encolado para reproducir el orden real de cambios
+    // (deletes incluidos; la cascada encola en orden).
     const sortedQueue = [...queue].sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
 
     for (const item of sortedQueue) {
@@ -454,7 +558,8 @@ export const useStore = create<AppState>()((set, get) => ({
         let isDelete = false;
         let matchId: string | undefined;
 
-        // Formato de id: tipo:id (insert/update) o tipo-del:id (delete)
+        // Formato de id: tipo:id (insert/update), tipo-del:id (delete)
+        // o ach:[achievementId]:[playerId] / ach-del:[achievementId]:[playerId].
         const idParts = item.id.split(':');
         const baseType = idParts[0]; // ej: 'match' o 'match-del'
         const realId = idParts.slice(1).join(':'); // por si el UUID contuviera ':'
@@ -462,19 +567,54 @@ export const useStore = create<AppState>()((set, get) => ({
 
         if (item.type === 'match') {
           matchId = realId;
-          payload = matches.find(m => m.id === matchId) ?? { id: matchId };
+          if (isDelete) {
+            payload = { id: matchId };
+          } else {
+            // Prioridad absoluta al SNAPSHOT encolado: si un merge remoto ya
+            // actualizó el estado en memoria, el snapshot sigue siendo la
+            // versión local pendiente de subir y debe ganar al subirse.
+            payload = isSyncQueueWithPayload(item) ? item.payload : matches.find(m => m.id === matchId);
+            // Si el recurso ya no existe localmente, la operación neta es un
+            // delete (evita recrear filas zombi en el remoto).
+            if (!payload) {
+              isDelete = true;
+              payload = { id: matchId };
+            }
+          }
         } else if (item.type === 'player') {
-          payload = players.find(p => p.id === realId) ?? { id: realId };
+          if (isDelete) {
+            payload = { id: realId };
+          } else {
+            payload = isSyncQueueWithPayload(item) ? item.payload : players.find(p => p.id === realId);
+            if (!payload) {
+              isDelete = true;
+              payload = { id: realId };
+            }
+          }
         } else if (item.type === 'game') {
-          payload = games.find(g => g.id === realId) ?? { id: realId };
+          if (isDelete) {
+            payload = { id: realId };
+          } else {
+            payload = isSyncQueueWithPayload(item) ? item.payload : games.find(g => g.id === realId);
+            if (!payload) {
+              isDelete = true;
+              payload = { id: realId };
+            }
+          }
         } else if (item.type === 'achievement') {
           const [, achievementId, playerId] = item.id.split(':');
-          payload = playerAchievements.find(a => a.achievementId === achievementId && a.playerId === playerId) ?? { achievementId, playerId };
+          if (isDelete) {
+            payload = { achievementId, playerId };
+          } else {
+            payload = playerAchievements.find(a => a.achievementId === achievementId && a.playerId === playerId);
+            if (!payload) {
+              isDelete = true;
+              payload = { achievementId, playerId };
+            }
+          }
         }
 
-        console.log('[syncPendingItems]', { id: item.id, type, isDelete, payload: JSON.stringify(payload).slice(0, 200) });
         const ok = await syncItemToRemote(type, payload, isDelete);
-        console.log('[syncPendingItems] result:', { id: item.id, ok });
         if (ok) {
           await clearSyncItem(item.id);
           // Marcar la partida como sincronizada si era un insert/update
@@ -482,98 +622,106 @@ export const useStore = create<AppState>()((set, get) => ({
             set((s) => ({
               matches: s.matches.map(m => m.id === matchId ? { ...m, synced: true } : m),
             }));
-          const updatedMatch = get().matches.find(m => m.id === matchId);
-          if (updatedMatch) await saveMatch(updatedMatch, true);
+            const updatedMatch = get().matches.find(m => m.id === matchId);
+            if (updatedMatch) await saveMatch(updatedMatch, true);
           }
         }
       } catch (e) {
         console.error('[syncPendingItems] item failed:', { id: item.id }, e);
       }
     }
-    const remaining = await getSyncQueue();
-    console.log('[syncPendingItems] remaining after sync:', remaining.map(q => q.id));
     get().refreshPendingSync();
   },
 
   syncFromRemote: async () => {
     const remote = await fetchRemoteState();
-
-    // Deduplicar el remoto por nombre para no reintroducir duplicados en
-    // el local (el remoto también puede contener duplicados de runs previos).
-    const { kept: remoteGames } = deduplicateByName(remote.games);
-    const { kept: remotePlayers } = deduplicateByName(remote.players);
-
-    if (remoteGames.length === 0 && remote.players.length === 0 && remote.matches.length === 0) {
-      // Turso está vacío: subir datos locales si los hay
-      await get().syncPendingItems();
+    if (!remote) {
+      // Error de red/credenciales: NO confundir con remoto vacío. La cola
+      // local permanece intacta para reintentarlo más tarde.
+      console.error('[syncFromRemote] descarga remota fallida; se conserva la cola pendiente');
+      set({ dbStatus: 'disconnected' });
       return;
     }
 
-    // Fusionar datos remotos con locales por ID, manteniendo el más reciente
+    // Deduplicar el remoto por nombre para no reintroducir duplicados en
+    // el local (el remoto también puede contener duplicados de runs previos).
+    const { kept: remoteGames, reassignments: remoteGameRemaps } = deduplicateByName(remote.games);
+    const { kept: remotePlayers, reassignments: remotePlayerRemaps } = deduplicateByName(remote.players);
+    const { matches: remoteMatches, achievements: remoteAchievements } = remapReferences(
+      remote.matches,
+      remote.playerAchievements,
+      remoteGameRemaps,
+      remotePlayerRemaps,
+    );
+
+    // Fusionar datos remotos con locales por ID con Last-Write-Wins basado
+    // en updatedAt (fallback createdAt). En empate gana el LOCAL: protege
+    // ediciones offline cuyo updatedAt coincide con la copia remota vieja.
     const { games: localGames, players: localPlayers, matches: localMatches, playerAchievements: localAchievements } = get();
 
-    const mergeById = <T extends { id: string; createdAt: string }>(local: T[], remote: T[]): T[] => {
+    const mergeById = <T extends { id: string; createdAt: string; updatedAt?: string }>(local: T[], remoteArr: T[]): T[] => {
       const map = new Map<string, T>();
       local.forEach(item => map.set(item.id, item));
-      remote.forEach(item => {
+      remoteArr.forEach(item => {
         const existing = map.get(item.id);
-        if (!existing || new Date(item.createdAt).getTime() >= new Date(existing.createdAt).getTime()) {
+        if (!existing) {
           map.set(item.id, item);
+          return;
         }
+        const versionOf = (x: T) => new Date(x.updatedAt ?? x.createdAt).getTime();
+        if (versionOf(item) > versionOf(existing)) map.set(item.id, item);
       });
       return Array.from(map.values());
     };
 
     let mergedGames = mergeById(localGames, remoteGames);
     let mergedPlayers = mergeById(localPlayers, remotePlayers);
-    const mergedMatches = mergeById(localMatches, remote.matches.map(m => ({ ...m, synced: true })));
+    const mergedMatches = mergeById(localMatches, remoteMatches.map(m => ({ ...m, synced: true })));
 
     // Deduplicar el resultado del merge por nombre: local y remoto pueden
-    // tener el mismo juego con IDs distintos. Priorizar el de createdAt más
-    // reciente.
-    const { kept: finalGames, removedIds: removedGameIds } = deduplicateByName(mergedGames);
-    const { kept: finalPlayers, removedIds: removedPlayerIds } = deduplicateByName(mergedPlayers);
+    // tener el mismo juego con IDs distintos. Las referencias del duplicado
+    // eliminado se reasignan al conservado.
+    const { kept: finalGames, reassignments: finalGameRemaps } = deduplicateByName(mergedGames);
+    const { kept: finalPlayers, reassignments: finalPlayerRemaps } = deduplicateByName(mergedPlayers);
+    const finalRefs = remapReferences(mergedMatches, [], finalGameRemaps, finalPlayerRemaps);
     mergedGames = finalGames;
     mergedPlayers = finalPlayers;
-
-    // Eliminar del local los IDs que el dedup descartó para no perpetuarlos
-    if (removedGameIds.length > 0) {
-      await Promise.all(removedGameIds.map(id => deleteGameDb(id)));
-    }
-    if (removedPlayerIds.length > 0) {
-      await Promise.all(removedPlayerIds.map(id => deletePlayerDb(id)));
-    }
 
     // Achievements: clave compuesta
     const achKey = (a: PlayerAchievement) => `${a.achievementId}:${a.playerId}`;
     const achMap = new Map<string, PlayerAchievement>();
     localAchievements.forEach(a => achMap.set(achKey(a), a));
-    remote.playerAchievements.forEach(a => {
+    remoteAchievements.forEach(a => {
       const existing = achMap.get(achKey(a));
-      if (!existing || new Date(a.unlockedAt).getTime() >= new Date(existing.unlockedAt).getTime()) {
+      if (!existing || new Date(a.unlockedAt).getTime() > new Date(existing.unlockedAt).getTime()) {
         achMap.set(achKey(a), a);
       }
     });
-    const mergedAchievements = Array.from(achMap.values());
+
+    const mergedAchievements = Array.from(achMap.values()).map(a => ({
+      ...a,
+      playerId: finalPlayerRemaps.get(a.playerId) ?? a.playerId,
+    }));
 
     set({
       games: mergedGames,
       players: mergedPlayers,
-      matches: mergedMatches,
+      matches: finalRefs.matches,
       playerAchievements: mergedAchievements,
     });
 
     // Persistir el resultado del merge en la BD local SIN re-encolarlo para
-    // sincronización.
+    // sincronización (los snapshots ya encolados conservan las versiones
+    // locales pendientes).
     await Promise.all([
       ...mergedGames.map(g => saveGame(g, true)),
       ...mergedPlayers.map(p => savePlayer(p, true)),
-      ...mergedMatches.map(m => saveMatch(m, true)),
+      ...finalRefs.matches.map(m => saveMatch(m, true)),
       ...mergedAchievements.map(a => saveAchievement(a, true)),
     ]);
 
-    // Subir únicamente los cambios locales que estaban realmente pendientes
-    // antes de la sincronización.
+    // Subir los cambios locales pendientes DESPUÉS del merge: los snapshots
+    // garantizan que se sube la versión local editada, no la mezclada.
     await get().syncPendingItems();
   },
 

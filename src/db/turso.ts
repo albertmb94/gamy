@@ -39,20 +39,6 @@ export function setDbStatusCallback(cb: (status: ExtendedDbStatus) => void) {
   statusCallback = cb;
 }
 
-export function getDbConfig(): {
-  tursoUrl?: string;
-  tursoToken?: string;
-  syncApiUrl?: string;
-  syncApiKey?: string;
-} {
-  return {
-    tursoUrl: TURSO_URL,
-    tursoToken: TURSO_TOKEN,
-    syncApiUrl: SYNC_API_URL,
-    syncApiKey: SYNC_API_KEY,
-  };
-}
-
 function getTursoClient(): Client | null {
   if (!TURSO_URL || !TURSO_TOKEN) return null;
   if (!tursoClient) {
@@ -61,7 +47,23 @@ function getTursoClient(): Client | null {
   return tursoClient;
 }
 
+/**
+ * Asegura el esquema remoto una sola vez por sesión. El resultado (éxito o
+ * fracaso) se cachea: en éxito se evita repetir el batch DDL en cada
+ * operación; en fracaso se resetea para permitir reintento.
+ */
+let schemaPromise: Promise<boolean> | null = null;
+
 export async function ensureSchema(): Promise<boolean> {
+  if (schemaPromise) return schemaPromise;
+  schemaPromise = doEnsureSchema().catch(() => {
+    schemaPromise = null;
+    return false;
+  });
+  return schemaPromise;
+}
+
+async function doEnsureSchema(): Promise<boolean> {
   const client = getTursoClient();
   if (!client) return false;
   try {
@@ -169,12 +171,30 @@ export function startDbMonitor(cb: (status: ExtendedDbStatus) => void) {
   const update = async () => {
     const status = await checkRemoteConnection();
     cb(status);
-    if (statusCallback) statusCallback(status);
+    if (statusCallback && statusCallback !== cb) statusCallback(status);
   };
 
   update();
   const interval = setInterval(update, 30000);
-  return () => clearInterval(interval);
+  return () => {
+    clearInterval(interval);
+    if (statusCallback === cb) statusCallback = null;
+  };
+}
+
+/**
+ * Valida que el payload tenga la forma mínima esperada antes de escribirlo
+ * en el remoto. Evita insertar filas corruptas (p. ej. desde snapshots
+ * parciales o colas heredadas).
+ */
+function isValidRemotePayload(type: string, p: Record<string, unknown>): boolean {
+  if (typeof p.id !== 'string' || !p.id) return false;
+  if (type === 'game') return typeof p.name === 'string' && !!p.name;
+  if (type === 'player') return typeof p.name === 'string' && !!p.name && typeof p.color === 'string';
+  if (type === 'match') return typeof p.gameId === 'string' && typeof p.date === 'string' && Array.isArray(p.playerIds);
+  if (type === 'achievement') return typeof p.achievementId === 'string' && typeof p.playerId === 'string';
+  if (type === 'remigio') return true;
+  return false;
 }
 
 export async function syncItemToRemote(
@@ -182,12 +202,21 @@ export async function syncItemToRemote(
   payload: unknown,
   isDelete = false
 ): Promise<boolean> {
+  const p = (payload ?? {}) as Record<string, unknown>;
+
+  // Un delete solo necesita el id; un upsert debe pasar la validación de forma.
+  if (!isDelete && !isValidRemotePayload(type, p)) {
+    console.error('[Turso sync] payload inválido, se descarta:', { type, payload });
+    // Devolvemos true para limpiar la cola: un payload inválido nunca será
+    // válido por más reintentos.
+    return true;
+  }
+
   // 1. Intentar sincronización directa con Turso
   const client = getTursoClient();
   if (client) {
     try {
       await ensureSchema();
-      const p = payload as Record<string, unknown>;
 
       if (isDelete) {
         if (type === 'game') await client.execute({ sql: 'DELETE FROM games WHERE id = ?', args: inArgs(p.id) });
@@ -266,20 +295,35 @@ export async function syncItemToRemote(
       }
       return true;
     } catch (e) {
-      console.error('[Turso sync error]', { type, isDelete, payload }, e);
+      console.error('[Turso sync error]', { type, isDelete }, e);
       return false;
     }
   }
 
-  // 2. Fallback a backend intermedio
+  // 2. Fallback a backend intermedio.
+  // Upserts: POST /sync/:type con el recurso en el cuerpo.
+  // Deletes: DELETE /sync/:type/:id (logros: /sync/achievement/:achievementId/:playerId).
   if (!SYNC_API_URL) return false;
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(SYNC_API_KEY ? { 'x-api-key': SYNC_API_KEY } : {}),
+    };
+
+    if (isDelete) {
+      let url = `${SYNC_API_URL}/sync/${type}`;
+      if (type === 'achievement') {
+        url += `/${encodeURIComponent(String(p.achievementId))}/${encodeURIComponent(String(p.playerId))}`;
+      } else {
+        url += `/${encodeURIComponent(String(p.id))}`;
+      }
+      const res = await fetch(url, { method: 'DELETE', headers });
+      return res.ok;
+    }
+
     const res = await fetch(`${SYNC_API_URL}/sync/${type}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(SYNC_API_KEY ? { 'x-api-key': SYNC_API_KEY } : {}),
-      },
+      headers,
       body: JSON.stringify(payload),
     });
     return res.ok;
@@ -297,14 +341,23 @@ function safeJson<T>(value: unknown, fallback: T): T {
   }
 }
 
-export async function fetchRemoteState(): Promise<{
+export interface RemoteState {
   games: Game[];
   players: Player[];
   matches: MatchRecord[];
   playerAchievements: PlayerAchievement[];
-}> {
+}
+
+/**
+ * Descarga el estado completo del remoto. Devuelve `null` si la descarga
+ * FALLA (red, credenciales, esquema) — nunca confundir un error con un
+ * remoto vacío para no disparar subidas masivas por un fallo transitorio.
+ */
+export async function fetchRemoteState(): Promise<RemoteState | null> {
   const client = getTursoClient();
   if (!client) {
+    // Sin configuración remota no hay nada que descargar; el llamador lo
+    // trata como "remoto vacío" legítimo.
     return { games: [], players: [], matches: [], playerAchievements: [] };
   }
 
@@ -365,23 +418,53 @@ export async function fetchRemoteState(): Promise<{
     return { games, players, matches, playerAchievements };
   } catch (e) {
     console.error('Error fetching remote state:', e);
-    return { games: [], players: [], matches: [], playerAchievements: [] };
+    return null;
   }
 }
 
-/** Descarga las partidas de Remigio almacenadas en Turso. */
-export async function fetchRemoteRemigio(): Promise<RemigioSession[]> {
+/** Descarga las partidas de Remigio almacenadas en Turso. `null` si falla. */
+export async function fetchRemoteRemigio(): Promise<RemigioSession[] | null> {
   const client = getTursoClient();
   if (!client) return [];
   try {
     await ensureSchema();
     const res = await client.execute('SELECT data FROM remigio_sessions');
-    return (res.rows as any[])
+    const sessions = (res.rows as any[])
       .map((row) => safeJson<RemigioSession | null>(row.data, null))
       .filter((s): s is RemigioSession => !!s && typeof s.id === 'string')
       .map((s) => ({ ...s, synced: true }));
+    // Normaliza fechas no ISO heredadas del seed de brisca-app (p. ej.
+    // "2026-05-24 14:24:59" sin zona) para que el LWW compare tiempos
+    // equivalentes.
+    return sessions.map(normalizeSessionDates);
   } catch (e) {
     console.error('Error fetching remote remigio sessions:', e);
-    return [];
+    return null;
   }
+}
+
+/**
+ * Convierte fechas "YYYY-MM-DD HH:MM:SS" (sin zona) a ISO UTC asumiendo que
+ * fueron guardadas en hora local del dispositivo original. Idempotente.
+ */
+export function normalizeSessionDates(s: RemigioSession): RemigioSession {
+  const fix = (v?: string | null): string | undefined => {
+    if (typeof v !== 'string' || !v) return v ?? undefined;
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(v)) {
+      const d = new Date(v.replace(' ', 'T'));
+      return isNaN(d.getTime()) ? v : d.toISOString();
+    }
+    return v;
+  };
+  return {
+    ...s,
+    created_at: fix(s.created_at) ?? s.created_at,
+    updated_at: fix(s.updated_at),
+    ended_at: fix(s.ended_at),
+    rounds: s.rounds?.map((r) => ({ ...r, completed_at: fix(r.completed_at) ?? r.completed_at })),
+    transactions: s.transactions?.map((t) => ({
+      ...t,
+      created_at: fix(t.created_at) ?? t.created_at,
+    })),
+  };
 }

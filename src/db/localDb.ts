@@ -29,7 +29,17 @@ interface LudoticDB extends DBSchema {
   };
   syncQueue: {
     key: string;
-    value: { id: string; type: 'match' | 'player' | 'game' | 'achievement'; updatedAt: string };
+    value: {
+      id: string;
+      type: 'match' | 'player' | 'game' | 'achievement';
+      updatedAt: string;
+      /**
+       * Snapshot del recurso en el momento de encolar. La sincronización
+       * sube SIEMPRE este snapshot (no la versión actual del estado) para
+       * que un merge remoto posterior no pise ediciones locales pendientes.
+       */
+      payload?: unknown;
+    };
   };
   meta: {
     key: string;
@@ -113,7 +123,7 @@ export async function saveGame(game: Game, skipSync = false) {
   const db = await getDb();
   await db.put('games', game);
   if (!skipSync) {
-    await db.put('syncQueue', { id: `game:${game.id}`, type: 'game', updatedAt: new Date().toISOString() });
+    await db.put('syncQueue', { id: `game:${game.id}`, type: 'game', updatedAt: new Date().toISOString(), payload: game });
   }
 }
 
@@ -127,7 +137,7 @@ export async function savePlayer(player: Player, skipSync = false) {
   const db = await getDb();
   await db.put('players', player);
   if (!skipSync) {
-    await db.put('syncQueue', { id: `player:${player.id}`, type: 'player', updatedAt: new Date().toISOString() });
+    await db.put('syncQueue', { id: `player:${player.id}`, type: 'player', updatedAt: new Date().toISOString(), payload: player });
   }
 }
 
@@ -141,7 +151,7 @@ export async function saveMatch(match: MatchRecord, skipSync = false) {
   const db = await getDb();
   await db.put('matches', match);
   if (!skipSync) {
-    await db.put('syncQueue', { id: `match:${match.id}`, type: 'match', updatedAt: new Date().toISOString() });
+    await db.put('syncQueue', { id: `match:${match.id}`, type: 'match', updatedAt: new Date().toISOString(), payload: match });
   }
 }
 
@@ -159,11 +169,29 @@ export async function saveAchievement(achievement: PlayerAchievement, skipSync =
       id: `ach:${achievement.achievementId}:${achievement.playerId}`,
       type: 'achievement',
       updatedAt: new Date().toISOString(),
+      payload: achievement,
     });
   }
 }
 
-export async function getSyncQueue(): Promise<{ id: string; type: 'match' | 'player' | 'game' | 'achievement'; updatedAt: string }[]> {
+export async function deleteAchievement(achievementId: string, playerId: string) {
+  const db = await getDb();
+  await db.delete('achievements', [achievementId, playerId]);
+  await db.put('syncQueue', {
+    id: `ach-del:${achievementId}:${playerId}`,
+    type: 'achievement',
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export type SyncQueueItem = {
+  id: string;
+  type: 'match' | 'player' | 'game' | 'achievement';
+  updatedAt: string;
+  payload?: unknown;
+};
+
+export async function getSyncQueue(): Promise<SyncQueueItem[]> {
   const db = await getDb();
   return db.getAll('syncQueue');
 }
@@ -201,8 +229,15 @@ export async function deleteRemigioSession(id: string) {
 // Turso (p. ej. borradas sin conexión). Se reintenta su borrado al sincronizar.
 export async function getRemigioTombstones(): Promise<string[]> {
   const db = await getDb();
-  const raw = await db.get('meta', 'remigioDeleted');
-  return typeof raw === 'string' ? (JSON.parse(raw) as string[]) : [];
+  try {
+    const raw = await db.get('meta', 'remigioDeleted');
+    if (typeof raw !== 'string' || !raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch (e) {
+    console.error('Error reading remigio tombstones:', e);
+    return [];
+  }
 }
 
 export async function setRemigioTombstones(ids: string[]) {
