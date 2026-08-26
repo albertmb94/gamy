@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Building2, Hexagon, Pyramid, XCircle, Sigma, Award, Landmark, Shield, Sparkles } from 'lucide-react';
-import type { ScoreCategory, ScoreCategoryMetadata } from '../types';
+import type { Game, ScoreCategory, ScoreCategoryMetadata } from '../types';
 
 // Tipos de fila del scorepad Duel. Incluyen la cabecera decorativa
 // (wonder_header) y cada uno de los metadatos disponibles como categoría.
@@ -356,4 +356,84 @@ export const SUPREMACY_OPTIONS: { type: string; label: string; meta: ScoreCatego
 
 export function supremacyMetaFor(type: string): ScoreCategoryMetadata | undefined {
   return SUPREMACY_OPTIONS.find(s => s.type === type)?.meta;
+}
+
+/**
+ * ÚNICA fuente de verdad para el total de un scorepad Duel: suma las
+ * categorías visibles del bloc (excluye metadatos excluidos y la propia
+ * fila de Total). Usada por el scorepad en juego, por el total guardado y
+ * por el preview de edición en Historial, de modo que los tres valores no
+ * pueden divergir.
+ */
+export function computeDuelTotal(
+  categories: ScoreCategory[],
+  scores: Record<string, number>
+): number {
+  return categories.reduce((sum, cat) => {
+    if (!cat.metadata) return sum;
+    if (DUEL_PAD_EXCLUDED_METADATA.has(cat.metadata)) return sum;
+    if (cat.metadata === 'wonder_total') return sum;
+    const v = scores[cat.id];
+    return sum + (typeof v === 'number' && !Number.isNaN(v) ? v : 0);
+  }, 0);
+}
+
+/**
+ * Fusiona las categorías del juego base con las de sus expansiones activas
+ * eliminando duplicados por id (la primera aparición gana: base antes que
+ * expansión). Evita dobles conteos y React duplicate keys.
+ */
+export function mergeCategoriesById(
+  ...groups: ScoreCategory[][]
+): ScoreCategory[] {
+  const seen = new Set<string>();
+  const result: ScoreCategory[] = [];
+  for (const group of groups) {
+    for (const cat of group) {
+      if (seen.has(cat.id)) continue;
+      seen.add(cat.id);
+      result.push(cat);
+    }
+  }
+  return result;
+}
+
+/** Detección única de "¿es un juego con scorepad Duel?" */
+export function isDuelPadGame(game: Pick<Game, 'name' | 'scoringTemplate'>): boolean {
+  return (
+    game.scoringTemplate.layout === 'duel-pad' ||
+    /7\s*wonders\s*duel/i.test(game.name)
+  );
+}
+
+/**
+ * Categorías del scorepad Duel en el orden visual canónico. Completa filas
+ * que falten con los defaults y descarta metadatos excluidos (supremacías,
+ * derrota, legacy). ÚNICA fuente de verdad usada por el scorepad en juego
+ * y por la vista readonly/edición del historial.
+ */
+export function orderedDuelCategories(
+  game: Pick<Game, 'name' | 'scoringTemplate'>
+): ScoreCategory[] {
+  const defaults = buildDuelPadCategories();
+  const out: ScoreCategory[] = [];
+  const seen = new Set<string>();
+  const isExcluded = (c: ScoreCategory) =>
+    !!c.metadata && DUEL_PAD_EXCLUDED_METADATA.has(c.metadata);
+  DUEL_PAD_METADATA_ORDER.forEach(meta => {
+    const found = game.scoringTemplate.categories.find(c => c.metadata === meta);
+    const def = defaults.find(d => d.metadata === meta);
+    const cat = found || def;
+    if (cat && !seen.has(cat.id) && !isExcluded(cat)) {
+      seen.add(cat.id);
+      out.push(cat);
+    }
+  });
+  game.scoringTemplate.categories.forEach(c => {
+    if (!seen.has(c.id) && !isExcluded(c)) {
+      seen.add(c.id);
+      out.push(c);
+    }
+  });
+  return out;
 }

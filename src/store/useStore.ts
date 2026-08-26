@@ -21,6 +21,7 @@ import {
 } from '../db/localDb';
 import { syncItemToRemote, checkRemoteConnection, fetchRemoteState } from '../db/turso';
 import { gamesSeed } from '../utils/gamesSeed';
+import { isDuelPadGame } from '../utils/duelPad';
 
 interface AppState {
   // Data
@@ -417,7 +418,9 @@ export const useStore = create<AppState>()((set, get) => ({
       }
 
       const playerScore = match.playerScores.find(ps => ps.playerId === playerId);
-      if (playerScore && playerScore.total >= 100) {
+      // club_100 solo tiene sentido en juegos de puntuación alta; en
+      // 7 Wonders Duel (~60-80 puntos máx.) sería inalcanzable.
+      if (playerScore && playerScore.total >= 100 && !(game && isDuelPadGame(game))) {
         state.addAchievement({
           achievementId: 'club_100',
           playerId,
@@ -431,8 +434,10 @@ export const useStore = create<AppState>()((set, get) => ({
           c.metadata === 'militar' || c.metadata === 'wonder_derrota' || c.metadata === 'wonder_militar'
         );
         if (militaryCat && playerScore) {
-          const milScore = playerScore.scores[militaryCat.id] || 0;
-          if (milScore === 0) {
+          // Solo si la categoría militar existe REALMENTE en las puntuaciones:
+          // su ausencia (partidas antiguas/plantillas cambiadas) no es un 0.
+          const milScore = playerScore.scores[militaryCat.id];
+          if (typeof milScore === 'number' && milScore === 0) {
             state.addAchievement({
               achievementId: 'pacificador',
               playerId,

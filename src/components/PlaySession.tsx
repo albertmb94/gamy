@@ -1,17 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, X, Dices, Check, Crown, Package, Target, Rocket, Award, ArrowLeft } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Game, Player, PlayerScore, ScoreCategory } from '../types';
 import { cn } from '../utils/cn';
 import { GameCover } from './GameCover';
 import {
-  DUEL_PAD_EXCLUDED_METADATA,
-  DUEL_PAD_METADATA_ORDER,
   DUEL_PAD_ROW_LABELS,
   SUPREMACY_OPTIONS,
-  buildDuelPadCategories,
+  computeDuelTotal,
   getDuelPadRowStyle,
   isDuelPadCategoryKind,
+  isDuelPadGame as detectDuelPadGame,
+  mergeCategoriesById,
+  orderedDuelCategories,
 } from '../utils/duelPad';
 
 type PlayStep = 'selectGame' | 'selectPlayers' | 'configure' | 'scoring';
@@ -55,29 +56,10 @@ function DuelPadScorepad({
   playerScores: Record<string, Record<string, number>>;
   onScoreChange: (playerId: string, catId: string, value: number) => void;
 }) {
-  const defaults = useMemo(() => buildDuelPadCategories(), []);
-  const orderedCats: ScoreCategory[] = useMemo(() => {
-    const out: ScoreCategory[] = [];
-    const seen = new Set<string>();
-    const isExcluded = (c: ScoreCategory) =>
-      !!c.metadata && DUEL_PAD_EXCLUDED_METADATA.has(c.metadata);
-    DUEL_PAD_METADATA_ORDER.forEach(meta => {
-      const found = game.scoringTemplate.categories.find(c => c.metadata === meta);
-      const def = defaults.find(d => d.metadata === meta);
-      const cat = found || def;
-      if (cat && !seen.has(cat.id) && !isExcluded(cat)) {
-        seen.add(cat.id);
-        out.push(cat);
-      }
-    });
-    game.scoringTemplate.categories.forEach(c => {
-      if (!seen.has(c.id) && !isExcluded(c)) {
-        seen.add(c.id);
-        out.push(c);
-      }
-    });
-    return out;
-  }, [game, defaults]);
+  const orderedCats: ScoreCategory[] = useMemo(
+    () => orderedDuelCategories(game),
+    [game]
+  );
 
   const headerStyle = getDuelPadRowStyle('wonder_header');
 
@@ -168,11 +150,9 @@ function DuelPadScorepad({
             </div>
             {selectedPlayers.map(p => {
               if (isTotal) {
-                const total = orderedCats.reduce((acc, c) => {
-                  if (c.id === cat.id) return acc;
-                  if (c.metadata === 'wonder_total') return acc;
-                  return acc + (playerScores[p.id]?.[c.id] || 0);
-                }, 0);
+                // Total canónico compartido con el total guardado y el
+                // preview de edición (computeDuelTotal).
+                const total = computeDuelTotal(orderedCats, playerScores[p.id] || {});
                 return (
                   <div
                     key={p.id}
@@ -319,9 +299,16 @@ function DuelSupremacyPicker({
 }
 
 export default function PlaySession() {
-  const { games, players, addMatch, setTab, selectedGameId: preSelectedGameId } = useStore();
+  const { games, players, addMatch, setTab, selectedGameId: preSelectedGameId, setSelectedGameId: clearStoreSelectedGameId } = useStore();
   const [step, setStep] = useState<PlayStep>(preSelectedGameId ? 'selectPlayers' : 'selectGame');
   const [selectedGameId, setSelectedGameId] = useState(preSelectedGameId || '');
+  // Consumir la preselección UNA sola vez: si el usuario sale de "Jugar" a
+  // mitad del flujo y vuelve días después, no debe arrancar con un juego
+  // zombi de una sesión anterior.
+  useEffect(() => {
+    if (preSelectedGameId) clearStoreSelectedGameId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [activeExpansionIds, setActiveExpansionIds] = useState<string[]>([]);
   const [firstPlayerId, setFirstPlayerId] = useState('');
@@ -354,12 +341,12 @@ export default function PlaySession() {
 
   const allCategories = useMemo(() => {
     if (!selectedGame) return [];
-    let cats = [...selectedGame.scoringTemplate.categories];
-    activeExpansionIds.forEach(eid => {
-      const exp = games.find(g => g.id === eid);
-      if (exp) cats = [...cats, ...exp.scoringTemplate.categories];
-    });
-    return cats;
+    // Dedupe por id: evita dobles conteos y React duplicate keys cuando base
+    // y expansión comparten categorías (p. ej. plantilla simple 'total').
+    return mergeCategoriesById(
+      selectedGame.scoringTemplate.categories,
+      ...activeExpansionIds.map(eid => games.find(g => g.id === eid)?.scoringTemplate.categories ?? []),
+    );
   }, [selectedGame, activeExpansionIds, games]);
 
   const allSpecialVictoryTypes = useMemo(() => {
@@ -397,15 +384,30 @@ export default function PlaySession() {
 
   const setSpecialVictory = (playerId: string, victoryType: string) => {
     if (specialVictories[playerId] === victoryType) {
+      // Desmarcar la victoria especial también limpia el ganador automático
+      // que se asignó al marcarla (evita ganadores huérfanos).
       setSpecialVictories(prev => { const n = { ...prev }; delete n[playerId]; return n; });
+      setWinnerId(prev => (prev === playerId ? '' : prev));
     } else {
       setSpecialVictories({ [playerId]: victoryType });
       setWinnerId(playerId);
     }
   };
 
+  // ¿El juego usa el scorepad Duel? Única derivación compartida por el
+  // scorepad, los totales y la sección de supremacías.
+  const isDuelPadGame = useMemo(
+    () => (selectedGame ? detectDuelPadGame(selectedGame) : false),
+    [selectedGame]
+  );
+
   const getPlayerTotal = (playerId: string): number => {
     const scores = playerScores[playerId] || {};
+    if (isDuelPadGame) {
+      // Mismo criterio que la fila Total del scorepad y que el preview
+      // de edición en Historial.
+      return computeDuelTotal(allCategories, scores);
+    }
     return allCategories.reduce((sum, cat) => {
       if (cat.metadata === 'wonder_total') return sum;
       return sum + (scores[cat.id] || 0);
@@ -657,10 +659,12 @@ export default function PlaySession() {
   if (step === 'scoring') {
     const selectedPlayers = players.filter(p => selectedPlayerIds.includes(p.id));
     const isSimple = selectedGame?.scoringTemplate.type === 'simple' && activeExpansionIds.length === 0;
-    const useDuelPad =
-      !!selectedGame &&
-      (selectedGame.scoringTemplate.layout === 'duel-pad' ||
-        /7\s*wonders\s*duel/i.test(selectedGame.name));
+    const useDuelPad = isDuelPadGame;
+
+    // Aviso de empate: determineWinner() resolvería por orden del array.
+    const totals = selectedPlayerIds.map(pid => ({ pid, total: getPlayerTotal(pid) }));
+    const maxTotal = totals.reduce((m, t) => Math.max(m, t.total), -Infinity);
+    const tiedCount = totals.filter(t => t.total === maxTotal && selectedPlayerIds.length > 1).length;
 
     return (
       <div className="space-y-4">
@@ -759,6 +763,11 @@ export default function PlaySession() {
         {!useDuelPad && !hasAnySpecialVictory && (
           <div className="glass-card p-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Ganador</h3>
+            {tiedCount > 1 && !winnerId && (
+              <p className="text-xs text-amber-600 font-semibold mb-2">
+                Empate a {maxTotal} puntos: elige el ganador manualmente (si no, se toma el primero).
+              </p>
+            )}
             <div className="flex gap-2 flex-wrap">
               {selectedPlayers.map(p => (
                 <button key={p.id} onClick={() => setWinnerId(winnerId === p.id ? '' : p.id)}

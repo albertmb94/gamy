@@ -5,7 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useRemigioStore } from '../../store/useRemigioStore';
-import { useRemigioDefaults } from '../../store/useRemigioDefaults';
+import { useRemigioDefaults, REMIGIO_MAX_PLAYERS, REMIGIO_MIN_PLAYERS } from '../../store/useRemigioDefaults';
+
+// Clamp monetario: los precios negativos invierten los pagos (perdedores
+// cobran del ganador), así que se fuerzan a >= 0.
+function moneyValue(raw: string): number {
+  const n = parseFloat(raw);
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, n);
+}
 
 export function RemigioNew() {
   const { create, openSession, goList, goSettings } = useRemigioStore();
@@ -22,26 +30,25 @@ export function RemigioNew() {
     const count = Math.max(2, stored.length || 3);
     return Array.from({ length: count }, (_, i) => stored[i] ?? '');
   });
+  const [error, setError] = useState('');
 
   const setNameAt = (i: number, v: string) =>
     setNames((arr) => arr.map((n, idx) => (idx === i ? v : n)));
-  const addPlayer = () => setNames((arr) => (arr.length < 8 ? [...arr, ''] : arr));
-  const removePlayer = () => setNames((arr) => (arr.length > 2 ? arr.slice(0, -1) : arr));
+  const addPlayer = () => setNames((arr) => (arr.length < REMIGIO_MAX_PLAYERS ? [...arr, ''] : arr));
+  const removePlayer = () => setNames((arr) => (arr.length > REMIGIO_MIN_PLAYERS ? arr.slice(0, -1) : arr));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanNames = names.map((n) => n.trim()).filter(Boolean);
-    if (cleanNames.length < 2) {
-      alert('Añade al menos 2 jugadores');
+    if (cleanNames.length < REMIGIO_MIN_PLAYERS) {
+      setError(`Añade al menos ${REMIGIO_MIN_PLAYERS} jugadores`);
       return;
     }
-    defaults.setDefaults({
-      defaultTargetScore: targetScore,
-      defaultPricePerRound: pricePerRound,
-      defaultPricePerGame: pricePerGame,
-      defaultPricePerReentry: pricePerReentry,
-      defaultPlayerNames: cleanNames,
-    });
+    if (cleanNames.length > maxPlayers) {
+      setError(`Tienes ${cleanNames.length} jugadores pero el máximo es ${maxPlayers}`);
+      return;
+    }
+    setError('');
     const id = create({
       name: name.trim() || 'Partida de Remigio',
       maxPlayers,
@@ -80,25 +87,37 @@ export function RemigioNew() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="maxPlayers">Máx. jugadores</Label>
-                <Input id="maxPlayers" type="number" min={2} max={8} value={maxPlayers} onChange={(e) => setMaxPlayers(parseInt(e.target.value) || 8)} />
+                <Input id="maxPlayers" type="number" min={REMIGIO_MIN_PLAYERS} max={REMIGIO_MAX_PLAYERS}
+                  value={maxPlayers}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    if (!Number.isNaN(n)) setMaxPlayers(Math.min(REMIGIO_MAX_PLAYERS, Math.max(REMIGIO_MIN_PLAYERS, n)));
+                  }} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="targetScore">Puntos objetivo</Label>
-                <Input id="targetScore" type="number" min={10} value={targetScore} onChange={(e) => setTargetScore(parseInt(e.target.value) || 150)} />
+                <Input id="targetScore" type="number" min={1} value={targetScore}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    if (!Number.isNaN(n) && n > 0) setTargetScore(n);
+                  }} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="ppr">€ por ronda</Label>
-                <Input id="ppr" type="number" step="0.01" value={pricePerRound} onChange={(e) => setPricePerRound(parseFloat(e.target.value) || 0)} />
+                <Input id="ppr" type="number" min="0" step="0.01" value={pricePerRound}
+                  onChange={(e) => setPricePerRound(moneyValue(e.target.value))} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ppg">€ por partida</Label>
-                <Input id="ppg" type="number" step="0.01" value={pricePerGame} onChange={(e) => setPricePerGame(parseFloat(e.target.value) || 0)} />
+                <Input id="ppg" type="number" min="0" step="0.01" value={pricePerGame}
+                  onChange={(e) => setPricePerGame(moneyValue(e.target.value))} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ppre">€ reenganche</Label>
-                <Input id="ppre" type="number" step="0.01" value={pricePerReentry} onChange={(e) => setPricePerReentry(parseFloat(e.target.value) || 0)} />
+                <Input id="ppre" type="number" min="0" step="0.01" value={pricePerReentry}
+                  onChange={(e) => setPricePerReentry(moneyValue(e.target.value))} />
               </div>
             </div>
           </CardContent>
@@ -129,7 +148,8 @@ export function RemigioNew() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-3">
+          {error && <span className="text-xs font-semibold text-destructive">{error}</span>}
           <Button type="submit" size="lg" className="rounded-full">Crear Partida</Button>
         </div>
       </form>

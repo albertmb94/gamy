@@ -3,13 +3,13 @@ import { PlusCircle, Users, Trophy, Play, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useRemigioStore } from '../../store/useRemigioStore';
-import { statusLabel } from '../engine';
+import { sessionPhase, statusLabel } from '../engine';
 import { RemigioSession } from '../types';
 import { cn } from '../../utils/cn';
 
 function SessionCard({ session, onOpen, onDelete }: { session: RemigioSession; onOpen: () => void; onDelete: () => void }) {
-  const finished = session.status === 'finished';
-  const paused = session.status === 'paused' || (session.status === 'waiting' && session.rounds.length > 0);
+  const finished = sessionPhase(session) === 'finished';
+  const paused = sessionPhase(session) === 'paused';
   return (
     <div className="glass-card overflow-hidden text-left animate-slide-up">
       <div className="flex items-center gap-3 p-4">

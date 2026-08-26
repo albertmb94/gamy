@@ -36,10 +36,13 @@ export function RoundHistory({ session }: { session: RemigioSession }) {
     setEditValues({});
   };
 
-  const submitEdit = (round: RemigioSession['rounds'][number]) => {
+  const submitEdit = (e: React.FormEvent, round: RemigioSession['rounds'][number]) => {
+    e.preventDefault();
+    // Validación real dentro de <form>: required + min evitan valores vacíos
+    // o negativos sin pasar por parseInt silencioso.
     const points = round.scores.map((score) => ({
       playerId: score.game_player_id,
-      points: parseInt(editValues[score.game_player_id] ?? '0', 10) || 0,
+      points: parseInt(editValues[score.game_player_id] ?? '', 10) || 0,
     }));
     updateLastRound(session.id, points);
     setEditingRoundId(null);
@@ -68,16 +71,18 @@ export function RoundHistory({ session }: { session: RemigioSession }) {
                 </div>
                 <div className="flex items-center gap-2">
                   {canEdit(round.id) && !isEditing && (
-                    <span
+                    <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         startEditing(round);
                       }}
                       className="inline-flex items-center justify-center text-xs font-medium text-primary hover:underline px-2 py-1 rounded"
+                      aria-label={`Editar ronda ${round.round_number}`}
                     >
                       <Pencil className="h-3 w-3 mr-1" />
                       Editar
-                    </span>
+                    </button>
                   )}
                   {isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                 </div>
@@ -85,7 +90,7 @@ export function RoundHistory({ session }: { session: RemigioSession }) {
               {isOpen && (
                 <div className="px-3 pb-3">
                   {isEditing ? (
-                    <div className="space-y-3 pt-1">
+                    <form className="space-y-3 pt-1" onSubmit={(e) => submitEdit(e, round)}>
                       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
                         {round.scores.map((score) => {
                           const player = session.players.find((p) => p.id === score.game_player_id);
@@ -113,12 +118,12 @@ export function RoundHistory({ session }: { session: RemigioSession }) {
                           <X className="h-4 w-4" />
                           Cancelar
                         </Button>
-                        <Button type="button" size="sm" onClick={() => submitEdit(round)}>
+                        <Button type="submit" size="sm">
                           <Save className="h-4 w-4" />
                           Guardar cambios
                         </Button>
                       </div>
-                    </div>
+                    </form>
                   ) : (
                     <table className="w-full text-sm">
                       <thead>

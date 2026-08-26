@@ -94,6 +94,12 @@ export function applyRound(
     })),
   });
 
+  // Añadir una ronda pone la partida "en juego" (normaliza waiting/paused
+  // legacy con rondas, y pausa → reanudación implícita al registrar ronda).
+  if (session.status !== 'finished') {
+    session.status = 'in_progress';
+  }
+
   // Acumular puntuaciones y rondas ganadas.
   for (const rp of activePoints) {
     const player = session.players.find((p) => p.id === rp.playerId);
@@ -338,4 +344,18 @@ export function statusLabel(status: RemigioSession['status']): string {
     default:
       return status;
   }
+}
+
+/**
+ * Fase "de juego" normalizada, fuente ÚNICA para la UI (pantalla y lista).
+ * Absorbe estados legacy: una partida `waiting` con rondas ya introducidas
+ * se trata como `in_progress`.
+ */
+export function sessionPhase(session: RemigioSession): RemigioSession['status'] {
+  if (session.status === 'finished') return 'finished';
+  if (session.status === 'paused') return 'paused';
+  if (session.status === 'in_progress') return 'in_progress';
+  // Legacy: waiting con rondas = en juego.
+  if (session.rounds.length > 0) return 'in_progress';
+  return 'waiting';
 }

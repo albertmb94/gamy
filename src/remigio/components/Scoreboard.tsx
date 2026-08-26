@@ -16,32 +16,19 @@ export function Scoreboard({ session }: { session: RemigioSession }) {
     return a.current_score - b.current_score;
   });
 
+  // Resultado ÚNICAMENTE de la última ronda (pagos round_payment). La
+  // liquidación total (partida + reenganches) se muestra aparte en el chip
+  // de balance; no se mezclan para no presentar el total como "resultado de
+  // ronda".
   function lastRoundResult(playerId: string): { won: boolean; amount: number } | null {
     if (!last) return null;
-
-    let won = false;
-    let amount = 0;
     const inRound = last.scores.some((s) => s.game_player_id === playerId);
-
     if (last.winner_id === playerId) {
       const losersCount = last.scores.filter((s) => s.game_player_id !== playerId).length;
-      won = true;
-      amount += losersCount * pricePerRound;
-    } else if (inRound) {
-      amount -= pricePerRound;
-    } else if (session.status !== 'finished') {
-      return null;
+      return { won: true, amount: losersCount * pricePerRound };
     }
-
-    if (session.status === 'finished') {
-      for (const tx of transactions) {
-        if (tx.type === 'round_payment') continue;
-        if (tx.recipient_id === playerId) amount += tx.amount;
-        if (tx.game_player_id === playerId) amount -= tx.amount;
-      }
-    }
-
-    return { won, amount };
+    if (inRound) return { won: false, amount: -pricePerRound };
+    return null;
   }
 
   return (

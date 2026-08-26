@@ -14,18 +14,22 @@ export function RoundForm({ session }: { session: RemigioSession }) {
   const addRound = useRemigioStore((s) => s.addRound);
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [points, setPoints] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
 
   const activePlayers = session.players.filter((p) => p.status === 'active');
   if (activePlayers.length === 0) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return; // evita doble registro de la misma ronda
     const roundPoints = activePlayers.map((p) => ({
       playerId: p.id,
       points: parseInt(points[p.id] ?? '', 10) || 0,
     }));
+    setSubmitting(true);
     addRound(session.id, roundPoints);
     setPoints({});
+    setSubmitting(false);
   };
 
   return (
@@ -129,7 +133,7 @@ export function RoundForm({ session }: { session: RemigioSession }) {
           )}
 
           <div className="flex justify-end pt-2">
-            <Button type="submit" size="lg">
+            <Button type="submit" size="lg" disabled={submitting}>
               <Send className="h-4 w-4" />
               Registrar Ronda
             </Button>

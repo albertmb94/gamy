@@ -17,12 +17,33 @@ export default function Players() {
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [error, setError] = useState('');
 
   const handleAdd = () => {
-    if (!newName.trim()) return;
-    addPlayer(newName.trim(), selectedColor);
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const existingId = addPlayer(trimmed, selectedColor);
+    if (existingId) {
+      // addPlayer devuelve el id existente si el nombre ya estaba registrado
+      // (la deduplicación lo habría descartado). Avisamos para que no crea
+      // que creó un jugador nuevo.
+      setError(`"${trimmed}" ya existe. No se duplicó.`);
+      setNewName('');
+      return;
+    }
+    setError('');
     setNewName('');
     setSelectedColor(COLORS[(players.length + 1) % COLORS.length]);
+  };
+
+  const saveRename = (playerId: string) => {
+    const ok = updatePlayer(playerId, { name: editName });
+    if (ok) {
+      setError('');
+      setEditId(null);
+    } else {
+      setError('Ya existe otro jugador con ese nombre.');
+    }
   };
 
   // Ordenar jugadores por victorias para una vista tipo "ranking"
@@ -81,8 +102,8 @@ export default function Players() {
                   <div className="flex gap-2">
                     <input value={editName} onChange={e => setEditName(e.target.value)}
                       className="input-field flex-1 text-sm py-1.5"
-                      autoFocus onKeyDown={e => { if (e.key === 'Enter') { updatePlayer(player.id, { name: editName }); setEditId(null); } }} />
-                    <button onClick={() => { updatePlayer(player.id, { name: editName }); setEditId(null); }}
+                      autoFocus onKeyDown={e => { if (e.key === 'Enter') { saveRename(player.id); } }} />
+                    <button onClick={() => saveRename(player.id)}
                       className="btn btn-success px-3 py-1.5"><Check className="h-4 w-4" /></button>
                   </div>
                 ) : (
@@ -122,6 +143,8 @@ export default function Players() {
           <p className="text-muted-foreground font-medium">Añade jugadores para empezar</p>
         </div>
       )}
+
+      {error && <p className="text-xs font-semibold text-red-600 text-center">{error}</p>}
     </div>
   );
 }

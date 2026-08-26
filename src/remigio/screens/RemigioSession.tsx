@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useRemigioStore } from '../../store/useRemigioStore';
-import { statusLabel } from '../engine';
+import { sessionPhase, statusLabel } from '../engine';
 import { Scoreboard } from '../components/Scoreboard';
 import { RoundForm } from '../components/RoundForm';
 import { RoundHistory } from '../components/RoundHistory';
@@ -30,11 +30,11 @@ export function RemigioSession({ sessionId }: { sessionId: string }) {
     );
   }
 
-  const hasRounds = session.rounds.length > 0;
-  const isWaiting = session.status === 'waiting' && !hasRounds;
-  const isInProgress = session.status === 'in_progress';
-  const isPaused = session.status === 'paused' || (session.status === 'waiting' && hasRounds);
-  const isFinished = session.status === 'finished';
+  const phase = sessionPhase(session);
+  const isWaiting = phase === 'waiting';
+  const isInProgress = phase === 'in_progress';
+  const isPaused = phase === 'paused';
+  const isFinished = phase === 'finished';
 
   const handleDelete = () => setConfirmDelete(true);
   const confirmDeleteNow = () => {
@@ -100,11 +100,11 @@ export function RemigioSession({ sessionId }: { sessionId: string }) {
 
       <Scoreboard session={session} />
 
-      {isInProgress && hasRounds && <RoundPaymentSummary session={session} />}
+      {isInProgress && session.rounds.length > 0 && <RoundPaymentSummary session={session} />}
 
       {isInProgress && <RoundForm session={session} />}
 
-      {hasRounds && <RoundHistory session={session} />}
+      {session.rounds.length > 0 && <RoundHistory session={session} />}
 
       {isFinished && <PaymentSummary session={session} />}
 

@@ -4,10 +4,16 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { useRemigioDefaults } from '../../store/useRemigioDefaults';
+import { useRemigioDefaults, REMIGIO_DEFAULTS } from '../../store/useRemigioDefaults';
 import { useRemigioStore } from '../../store/useRemigioStore';
 
 type Notice = 'saved' | 'reset' | null;
+
+function moneyValue(raw: string): number {
+  const n = parseFloat(raw);
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, n);
+}
 
 export function RemigioSettings() {
   const goList = useRemigioStore((s) => s.goList);
@@ -35,11 +41,12 @@ export function RemigioSettings() {
 
   const handleReset = () => {
     stored.resetDefaults();
-    setPricePerRound(0);
-    setPricePerGame(0);
-    setPricePerReentry(0);
-    setTargetScore(150);
-    setPlayerNames(['']);
+    // Reflejar los valores canónicos reales del store (no literales sueltos).
+    setPricePerRound(REMIGIO_DEFAULTS.defaultPricePerRound);
+    setPricePerGame(REMIGIO_DEFAULTS.defaultPricePerGame);
+    setPricePerReentry(REMIGIO_DEFAULTS.defaultPricePerReentry);
+    setTargetScore(REMIGIO_DEFAULTS.defaultTargetScore);
+    setPlayerNames(REMIGIO_DEFAULTS.defaultPlayerNames.length > 0 ? [...REMIGIO_DEFAULTS.defaultPlayerNames] : ['']);
     setNotice('reset');
   };
 
@@ -78,8 +85,11 @@ export function RemigioSettings() {
                 id="targetScore"
                 type="number"
                 value={targetScore}
-                onChange={(e) => setTargetScore(parseInt(e.target.value) || 150)}
-                min={50}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value, 10);
+                  if (!Number.isNaN(n) && n > 0) setTargetScore(n);
+                }}
+                min={1}
               />
             </div>
           </div>
@@ -90,9 +100,10 @@ export function RemigioSettings() {
               <Input
                 id="pricePerRound"
                 type="number"
+                min="0"
                 step="0.01"
                 value={pricePerRound}
-                onChange={(e) => setPricePerRound(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setPricePerRound(moneyValue(e.target.value))}
               />
             </div>
             <div className="space-y-2">
@@ -100,9 +111,10 @@ export function RemigioSettings() {
               <Input
                 id="pricePerGame"
                 type="number"
+                min="0"
                 step="0.01"
                 value={pricePerGame}
-                onChange={(e) => setPricePerGame(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setPricePerGame(moneyValue(e.target.value))}
               />
             </div>
             <div className="space-y-2">
@@ -110,9 +122,10 @@ export function RemigioSettings() {
               <Input
                 id="pricePerReentry"
                 type="number"
+                min="0"
                 step="0.01"
                 value={pricePerReentry}
-                onChange={(e) => setPricePerReentry(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setPricePerReentry(moneyValue(e.target.value))}
               />
             </div>
           </div>

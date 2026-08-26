@@ -8,13 +8,14 @@ import { useModalLock } from '../utils/useModalLock';
 import { ModalOverlay } from './ui/ModalOverlay';
 import { Game, Player, PlayerScore, ScoreCategory } from '../types';
 import {
-  DUEL_PAD_EXCLUDED_METADATA,
-  DUEL_PAD_METADATA_ORDER,
   DUEL_PAD_ROW_LABELS,
   SUPREMACY_TYPES,
-  buildDuelPadCategories,
+  computeDuelTotal,
   getDuelPadRowStyle,
   isDuelPadCategoryKind,
+  isDuelPadGame,
+  mergeCategoriesById,
+  orderedDuelCategories,
   supremacyMetaFor,
 } from '../utils/duelPad';
 
@@ -141,16 +142,22 @@ export default function History() {
     if (!editGame || editDraft.playerIds.length === 0) return;
 
     const sameGame = editDraft.gameId === detailMatch.gameId;
-    const allCats: ScoreCategory[] = [...editGame.scoringTemplate.categories];
-    if (sameGame) {
-      detailMatch.activeExpansionIds.forEach(eid => {
-        const exp = games.find(g => g.id === eid);
-        if (exp) allCats.push(...exp.scoringTemplate.categories);
-      });
-    }
+    const allCats: ScoreCategory[] = mergeCategoriesById(
+      editGame.scoringTemplate.categories,
+      ...(sameGame
+        ? detailMatch.activeExpansionIds.map(
+            eid => games.find(g => g.id === eid)?.scoringTemplate.categories ?? [],
+          )
+        : []),
+    );
+    const useDuelTotal = isDuelPadGame(editGame);
 
     const computeTotal = (pid: string) => {
       if (allCats.length === 0) return editDraft.scores[pid]?.['total'] || 0;
+      if (useDuelTotal) {
+        // Mismo criterio que el scorepad en juego y su fila Total.
+        return computeDuelTotal(allCats, editDraft.scores[pid] || {});
+      }
       // La fila Total (wonder_total) es calculada: no se suma para evitar
       // doble conteo con valores heredados de partidas antiguas.
       return allCats.reduce((sum, cat) =>
@@ -368,7 +375,7 @@ export default function History() {
 
                   <div>
                     <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">Ganador</label>
-                    {isDuelPadMatch(draftGame) && (
+                    {isDuelPadGame(draftGame) && (
                       <div className="flex flex-wrap gap-1.5 mb-2">
                         <button type="button"
                           onClick={() => updateDraft({ sup: null })}
@@ -420,7 +427,7 @@ export default function History() {
               const cats = sameGame
                 ? allCatsFor(draftGame, detailMatch, games)
                 : [...draftGame.scoringTemplate.categories];
-              if (isDuelPadMatch(draftGame)) {
+              if (isDuelPadGame(draftGame)) {
                 const rows = (editDraft ? editDraft.playerIds : detailMatch.playerIds).map(pid => {
                   const stored = detailMatch.playerScores.find(ps => ps.playerId === pid);
                   return {
@@ -552,18 +559,18 @@ export default function History() {
   );
 }
 
-/** Categorías de un juego + expansiones activas de la partida. */
+/** Categorías de un juego + expansiones activas de la partida (dedup por id). */
 function allCatsFor(
   game: Game,
   match: { activeExpansionIds: string[] },
   games: Game[],
 ): ScoreCategory[] {
-  const cats: ScoreCategory[] = [...game.scoringTemplate.categories];
-  match.activeExpansionIds.forEach(eid => {
-    const exp = games.find(g => g.id === eid);
-    if (exp) cats.push(...exp.scoringTemplate.categories);
-  });
-  return cats;
+  return mergeCategoriesById(
+    game.scoringTemplate.categories,
+    ...match.activeExpansionIds.map(
+      eid => games.find(g => g.id === eid)?.scoringTemplate.categories ?? [],
+    ),
+  );
 }
 
 function DuelSupremacySummary({
@@ -603,12 +610,6 @@ function DuelSupremacySummary({
   );
 }
 
-function isDuelPadMatch(game: Game): boolean {
-  if (game.scoringTemplate.layout === 'duel-pad') return true;
-  if (/7\s*wonders\s*duel/i.test(game.name)) return true;
-  return false;
-}
-
 function DuelPadReadonly({
   game,
   playerRows,
@@ -624,36 +625,12 @@ function DuelPadReadonly({
   editingScores?: Record<string, Record<string, number>> | null;
   onScoreChange?: (playerId: string, catId: string, value: number) => void;
 }) {
-  const defaults = buildDuelPadCategories();
-  const orderedCats = (() => {
-    const out: ScoreCategory[] = [];
-    const seen = new Set<string>();
-    const isExcluded = (c: ScoreCategory) =>
-      !!c.metadata && DUEL_PAD_EXCLUDED_METADATA.has(c.metadata);
-    DUEL_PAD_METADATA_ORDER.forEach(meta => {
-      const found = game.scoringTemplate.categories.find(c => c.metadata === meta);
-      const def = defaults.find(d => d.metadata === meta);
-      const cat = found || def;
-      if (cat && !seen.has(cat.id) && !isExcluded(cat)) {
-        seen.add(cat.id);
-        out.push(cat);
-      }
-    });
-    game.scoringTemplate.categories.forEach(c => {
-      if (!seen.has(c.id) && !isExcluded(c)) {
-        seen.add(c.id);
-        out.push(c);
-      }
-    });
-    return out;
-  })();
+  const orderedCats = orderedDuelCategories(game);
 
   const liveTotal = (pid: string): number => {
     if (editingScores) {
-      return orderedCats.reduce(
-        (sum, c) => c.metadata === 'wonder_total' ? sum : sum + (editingScores[pid]?.[c.id] || 0),
-        0,
-      );
+      // Mismo criterio que el scorepad en juego y que el total guardado.
+      return computeDuelTotal(orderedCats, editingScores[pid] || {});
     }
     return playerRows.find(r => r.playerId === pid)?.total || 0;
   };

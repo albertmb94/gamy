@@ -92,6 +92,7 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
   const [difficulty, setDifficulty] = useState(gameToEdit?.difficulty || 0);
   const [duration, setDuration] = useState(gameToEdit?.duration || 0);
   const [newCatName, setNewCatName] = useState('');
+  const [formError, setFormError] = useState('');
 
   const baseGames = games.filter(g => !g.isExpansion && g.id !== gameToEdit?.id);
 
@@ -130,7 +131,8 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
   };
 
   const handleSave = () => {
-    if (!name.trim()) return;
+    if (!name.trim()) { setFormError('El nombre es obligatorio'); return; }
+    setFormError('');
     const isDuelPad =
       name.toLowerCase().includes('7 wonders') ||
       categories.some(c => c.metadata?.startsWith('wonder_'));
@@ -152,7 +154,12 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
     };
 
     if (gameToEdit) {
-      updateGame(gameToEdit.id, payload);
+      const ok = updateGame(gameToEdit.id, payload);
+      if (!ok) {
+        // Colisión de nombre: no se renombra para no borrar otro juego por dedup.
+        setFormError('Ya existe otro juego con ese nombre.');
+        return;
+      }
     } else {
       addGame(payload);
     }
@@ -302,16 +309,16 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
 
               {allowSpecialVictory && (
                 <div className="space-y-2">
-                  {specialVictoryTypes.map((svt, i) => (
-                    <div key={i} className="flex gap-2 items-center">
+                  {specialVictoryTypes.map((svt) => (
+                    <div key={svt} className="flex gap-2 items-center">
                       <span className="flex-1 input-field text-sm py-2">{svt}</span>
-                      <button onClick={() => setSpecialVictoryTypes(prev => prev.filter((_, idx) => idx !== i))} className="btn btn-danger px-2.5 py-2"><X className="h-4 w-4" /></button>
+                      <button onClick={() => setSpecialVictoryTypes(prev => prev.filter(x => x !== svt))} className="btn btn-danger px-2.5 py-2"><X className="h-4 w-4" /></button>
                     </div>
                   ))}
                   <div className="flex gap-2">
                     <input value={newSVT} onChange={e => setNewSVT(e.target.value)} placeholder="Ej: Supremacía Militar"
                       className="input-field flex-1 text-sm py-2" />
-                    <button onClick={() => { if (newSVT.trim()) { setSpecialVictoryTypes(p => [...p, newSVT.trim()]); setNewSVT(''); } }}
+                    <button onClick={() => { const t = newSVT.trim(); if (t && !specialVictoryTypes.includes(t)) { setSpecialVictoryTypes(p => [...p, t]); setNewSVT(''); } }}
                       className="btn btn-primary px-3 py-2"><Plus className="h-4 w-4" /></button>
                   </div>
                 </div>
@@ -326,6 +333,9 @@ function GameForm({ gameToEdit, onClose }: { gameToEdit?: Game; onClose: () => v
             {gameToEdit ? 'Guardar cambios' : 'Crear juego'}
           </button>
         </div>
+        {formError && (
+          <p className="mt-3 text-center text-xs font-semibold text-red-600">{formError}</p>
+        )}
       </div>
     </ModalOverlay>
   );
