@@ -81,15 +81,6 @@ export function getDb() {
   return dbPromise;
 }
 
-export async function isDbAvailable(): Promise<boolean> {
-  try {
-    const db = await getDb();
-    return !!db;
-  } catch {
-    return false;
-  }
-}
-
 export async function loadLocalState(): Promise<{
   games: Game[];
   players: Player[];

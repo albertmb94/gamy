@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2, Check, Users } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../utils/cn';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 
 const COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316', '#14B8A6', '#6366F1'];
 
@@ -18,6 +19,7 @@ export default function Players() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [error, setError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const handleAdd = () => {
     const trimmed = newName.trim();
@@ -131,7 +133,7 @@ export default function Players() {
               <div className="flex gap-0.5 shrink-0">
                 <button onClick={() => { setEditId(player.id); setEditName(player.name); }}
                   className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-secondary transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
-                <button onClick={() => { if (confirm(`¿Eliminar a ${player.name}?`)) deletePlayer(player.id); }}
+                <button onClick={() => setDeleteTarget(player.id)}
                   className="text-muted-foreground hover:text-destructive p-1.5 rounded-full hover:bg-secondary transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
               </div>
             </div>
@@ -147,6 +149,20 @@ export default function Players() {
       )}
 
       {error && <p className="text-xs font-semibold text-red-600 text-center">{error}</p>}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Eliminar jugador"
+        description="Se eliminarán también sus partidas y logros. Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        destructive
+        onConfirm={() => {
+          if (deleteTarget) deletePlayer(deleteTarget);
+          setDeleteTarget(null);
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

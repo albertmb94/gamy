@@ -48,7 +48,6 @@ export interface Game {
   id: string;
   name: string;
   imageUrl?: string;
-  localImageData?: string;
   types: GameType[];
   isExpansion: boolean;
   baseGameId?: string;
@@ -94,14 +93,6 @@ export interface MatchRecord {
   createdAt: string;
   /** Última modificación; resuelve conflictos en la sincronización (LWW). */
   updatedAt?: string;
-}
-
-export interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  condition: (player: Player, matches: MatchRecord[], games: Game[]) => boolean;
 }
 
 export interface PlayerAchievement {

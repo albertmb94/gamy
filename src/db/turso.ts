@@ -30,14 +30,7 @@ const TURSO_TOKEN = (typeof import.meta.env !== 'undefined' ? import.meta.env.VI
 const SYNC_API_URL = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_SYNC_API_URL : undefined) as string | undefined;
 const SYNC_API_KEY = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_SYNC_API_KEY : undefined) as string | undefined;
 
-export type ExtendedDbStatus = DbStatus | 'local';
-
-let statusCallback: ((status: ExtendedDbStatus) => void) | null = null;
 let tursoClient: Client | null = null;
-
-export function setDbStatusCallback(cb: (status: ExtendedDbStatus) => void) {
-  statusCallback = cb;
-}
 
 function getTursoClient(): Client | null {
   if (!TURSO_URL || !TURSO_TOKEN) return null;
@@ -134,7 +127,7 @@ async function doEnsureSchema(): Promise<boolean> {
   }
 }
 
-export async function checkRemoteConnection(): Promise<ExtendedDbStatus> {
+export async function checkRemoteConnection(): Promise<DbStatus> {
   // 1. Intentar conexión directa a Turso
   const client = getTursoClient();
   if (client) {
@@ -165,21 +158,15 @@ export async function checkRemoteConnection(): Promise<ExtendedDbStatus> {
   }
 }
 
-export function startDbMonitor(cb: (status: ExtendedDbStatus) => void) {
-  statusCallback = cb;
-
+export function startDbMonitor(cb: (status: DbStatus) => void) {
   const update = async () => {
     const status = await checkRemoteConnection();
     cb(status);
-    if (statusCallback && statusCallback !== cb) statusCallback(status);
   };
 
   update();
   const interval = setInterval(update, 30000);
-  return () => {
-    clearInterval(interval);
-    if (statusCallback === cb) statusCallback = null;
-  };
+  return () => clearInterval(interval);
 }
 
 /**

@@ -6,6 +6,7 @@ import { statusLabel } from '../remigio/engine';
 import { cn } from '../utils/cn';
 import { useModalLock } from '../utils/useModalLock';
 import { ModalOverlay } from './ui/ModalOverlay';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 import { Game, Player, PlayerScore, ScoreCategory } from '../types';
 import {
   DUEL_PAD_ROW_LABELS,
@@ -47,6 +48,7 @@ export default function History() {
   const openRemigioSession = useRemigioStore(s => s.openSession);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<MatchEditDraft | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [filterGameId, setFilterGameId] = useState('');
 
   const baseGames = games.filter(g => !g.isExpansion);
@@ -549,18 +551,28 @@ export default function History() {
               ) : (
                 <>
                   <button onClick={startEdit} className="btn btn-secondary flex-1 py-3"><Pencil className="h-4 w-4" /> Editar</button>
-                  <button onClick={() => {
-                    if (confirm('¿Eliminar esta partida?')) {
-                      deleteMatch(detailMatch.id);
-                      closeDetail();
-                    }
-                  }} className="btn btn-danger py-3 px-5"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={() => setConfirmDelete(true)} className="btn btn-danger py-3 px-5"><Trash2 className="h-4 w-4" /></button>
                 </>
               )}
             </div>
           </div>
         </ModalOverlay>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Eliminar partida"
+        description="¿Estás seguro de que quieres eliminar esta partida? Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        destructive
+        onConfirm={() => {
+          if (detailMatch) deleteMatch(detailMatch.id);
+          setConfirmDelete(false);
+          closeDetail();
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }
