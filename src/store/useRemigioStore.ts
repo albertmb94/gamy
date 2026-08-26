@@ -10,7 +10,6 @@ import {
   setRemigioTombstones,
 } from '../db/localDb';
 import { syncItemToRemote, fetchRemoteRemigio, normalizeSessionDates } from '../db/turso';
-import { remigioSeed } from '../remigio/seed';
 
 export type RemigioScreen = 'list' | 'new' | 'session' | 'settings';
 
@@ -112,6 +111,9 @@ export const useRemigioStore = create<RemigioState>()((set, get) => {
 
     load: async () => {
       // Importa (una sola vez) las partidas históricas migradas de brisca-app.
+      // Import dinámico: el seed (~1800 líneas) no debe viajar en el bundle
+      // inicial. Solo se descarga si aún no se ha importado.
+      const { remigioSeed } = await import('../remigio/seed');
       // Las fechas se normalizan a ISO porque el seed contiene valores sin zona.
       await importRemigioSeedOnce(remigioSeed.map(normalizeSessionDates)).catch((e) =>
         console.error('Error importing remigio seed:', e)

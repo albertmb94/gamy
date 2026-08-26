@@ -22,6 +22,9 @@ const TABS = [
 export default function App() {
   const { currentTab, setTab, loadFromLocalDb } = useStore();
   const dbStatus = useStore((s) => s.dbStatus);
+  const setDbStatus = useStore((s) => s.setDbStatus);
+  const syncPending = useStore((s) => s.syncPendingItems);
+  const checkConnection = useStore((s) => s.checkConnection);
   const loadRemigio = useRemigioStore((s) => s.load);
   const syncRemigio = useRemigioStore((s) => s.syncAll);
 
@@ -33,6 +36,24 @@ export default function App() {
   useEffect(() => {
     if (dbStatus === 'connected') syncRemigio();
   }, [dbStatus, syncRemigio]);
+
+  // Reanudar la sincronización al recuperar la conexión (y marcar desconexión
+  // al perderla). Es la única vía de sincronización reactiva; el poll del
+  // indicador solo actualiza el estado visual.
+  useEffect(() => {
+    const onOnline = () => {
+      checkConnection();
+      syncPending();
+      syncRemigio();
+    };
+    const onOffline = () => setDbStatus('disconnected');
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, [checkConnection, syncPending, syncRemigio, setDbStatus]);
 
   // Al cambiar de pestaña, el scroll vuelve arriba: si no, el scroll heredado
   // dejaba el título de la sección debajo del header sticky (transparente).

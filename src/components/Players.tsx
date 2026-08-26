@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2, Check, Users } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../utils/cn';
@@ -47,11 +47,13 @@ export default function Players() {
   };
 
   // Ordenar jugadores por victorias para una vista tipo "ranking"
-  const sortedPlayers = [...players].sort((a, b) => {
-    const aWins = matches.filter(m => m.winnerId === a.id).length;
-    const bWins = matches.filter(m => m.winnerId === b.id).length;
-    return bWins - aWins;
-  });
+  const sortedPlayers = useMemo(() => {
+    const winsByPlayer = new Map<string, number>();
+    for (const m of matches) {
+      if (m.winnerId) winsByPlayer.set(m.winnerId, (winsByPlayer.get(m.winnerId) || 0) + 1);
+    }
+    return [...players].sort((a, b) => (winsByPlayer.get(b.id) || 0) - (winsByPlayer.get(a.id) || 0));
+  }, [players, matches]);
 
   return (
     <div className="space-y-4">

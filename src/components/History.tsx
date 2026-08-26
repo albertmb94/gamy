@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Crown, Pencil, Trash2, Save, X, Target, ScrollText, Spade, ArrowLeft, CalendarDays } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useRemigioStore } from '../store/useRemigioStore';
@@ -50,19 +50,25 @@ export default function History() {
   const [filterGameId, setFilterGameId] = useState('');
 
   const baseGames = games.filter(g => !g.isExpansion);
-  const sortedMatches = [...matches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const sortedMatches = useMemo(
+    () => [...matches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [matches],
+  );
 
-  const filteredMatches = sortedMatches.filter(m => {
+  const filteredMatches = useMemo(() => sortedMatches.filter(m => {
     if (filterGameId && m.gameId !== filterGameId && filterGameId !== 'remigio') return false;
     if (filterGameId === 'remigio') return false;
     return true;
-  });
+  }), [sortedMatches, filterGameId]);
 
   const showRemigio = filterGameId === '' || filterGameId === 'remigio';
-  const entries: Entry[] = [
-    ...filteredMatches.map(m => ({ kind: 'match' as const, date: m.date, id: m.id })),
-    ...(showRemigio ? remigioSessions.map(s => ({ kind: 'remigio' as const, date: s.created_at, id: s.id })) : []),
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const entries: Entry[] = useMemo(() => {
+    const base: Entry[] = [
+      ...filteredMatches.map(m => ({ kind: 'match' as const, date: m.date, id: m.id })),
+      ...(showRemigio ? remigioSessions.map(s => ({ kind: 'remigio' as const, date: s.created_at, id: s.id })) : []),
+    ];
+    return base.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [filteredMatches, showRemigio, remigioSessions]);
 
   const openRemigio = (id: string) => { openRemigioModule(); openRemigioSession(id); };
 
