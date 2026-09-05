@@ -6,14 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useRemigioStore } from '../../store/useRemigioStore';
 import { useRemigioDefaults, REMIGIO_MAX_PLAYERS, REMIGIO_MIN_PLAYERS } from '../../store/useRemigioDefaults';
-
-// Clamp monetario: los precios negativos invierten los pagos (perdedores
-// cobran del ganador), así que se fuerzan a >= 0.
-function moneyValue(raw: string): number {
-  const n = parseFloat(raw);
-  if (Number.isNaN(n)) return 0;
-  return Math.max(0, n);
-}
+import { IntegerField, MoneyField } from '../components/NumberDraftInput';
 
 export function RemigioNew() {
   const { create, openSession, goList, goSettings } = useRemigioStore();
@@ -87,37 +80,28 @@ export function RemigioNew() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="maxPlayers">Máx. jugadores</Label>
-                <Input id="maxPlayers" type="number" min={REMIGIO_MIN_PLAYERS} max={REMIGIO_MAX_PLAYERS}
+                <IntegerField id="maxPlayers" min={REMIGIO_MIN_PLAYERS} max={REMIGIO_MAX_PLAYERS}
                   value={maxPlayers}
-                  onChange={(e) => {
-                    const n = parseInt(e.target.value, 10);
-                    if (!Number.isNaN(n)) setMaxPlayers(Math.min(REMIGIO_MAX_PLAYERS, Math.max(REMIGIO_MIN_PLAYERS, n)));
-                  }} />
+                  onCommit={(n) => setMaxPlayers(Math.min(REMIGIO_MAX_PLAYERS, Math.max(REMIGIO_MIN_PLAYERS, n)))} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="targetScore">Puntos objetivo</Label>
-                <Input id="targetScore" type="number" min={1} value={targetScore}
-                  onChange={(e) => {
-                    const n = parseInt(e.target.value, 10);
-                    if (!Number.isNaN(n) && n > 0) setTargetScore(n);
-                  }} />
+                <IntegerField id="targetScore" min={1} value={targetScore}
+                  onCommit={(n) => { if (n > 0) setTargetScore(n); }} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="ppr">€ por ronda</Label>
-                <Input id="ppr" type="number" min="0" step="0.01" value={pricePerRound}
-                  onChange={(e) => setPricePerRound(moneyValue(e.target.value))} />
+                <MoneyField id="ppr" value={pricePerRound} onCommit={setPricePerRound} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ppg">€ por partida</Label>
-                <Input id="ppg" type="number" min="0" step="0.01" value={pricePerGame}
-                  onChange={(e) => setPricePerGame(moneyValue(e.target.value))} />
+                <MoneyField id="ppg" value={pricePerGame} onCommit={setPricePerGame} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ppre">€ reenganche</Label>
-                <Input id="ppre" type="number" min="0" step="0.01" value={pricePerReentry}
-                  onChange={(e) => setPricePerReentry(moneyValue(e.target.value))} />
+                <MoneyField id="ppre" value={pricePerReentry} onCommit={setPricePerReentry} />
               </div>
             </div>
           </CardContent>

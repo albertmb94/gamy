@@ -6,14 +6,9 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useRemigioDefaults, REMIGIO_DEFAULTS } from '../../store/useRemigioDefaults';
 import { useRemigioStore } from '../../store/useRemigioStore';
+import { IntegerField, MoneyField } from '../components/NumberDraftInput';
 
 type Notice = 'saved' | 'reset' | null;
-
-function moneyValue(raw: string): number {
-  const n = parseFloat(raw);
-  if (Number.isNaN(n)) return 0;
-  return Math.max(0, n);
-}
 
 export function RemigioSettings() {
   const goList = useRemigioStore((s) => s.goList);
@@ -81,14 +76,10 @@ export function RemigioSettings() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="targetScore">Puntos objetivo</Label>
-              <Input
+              <IntegerField
                 id="targetScore"
-                type="number"
                 value={targetScore}
-                onChange={(e) => {
-                  const n = parseInt(e.target.value, 10);
-                  if (!Number.isNaN(n) && n > 0) setTargetScore(n);
-                }}
+                onCommit={(n) => { if (n > 0) setTargetScore(n); }}
                 min={1}
               />
             </div>
@@ -97,35 +88,26 @@ export function RemigioSettings() {
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label htmlFor="pricePerRound">€ por ronda</Label>
-              <Input
+              <MoneyField
                 id="pricePerRound"
-                type="number"
-                min="0"
-                step="0.01"
                 value={pricePerRound}
-                onChange={(e) => setPricePerRound(moneyValue(e.target.value))}
+                onCommit={setPricePerRound}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="pricePerGame">€ por partida</Label>
-              <Input
+              <MoneyField
                 id="pricePerGame"
-                type="number"
-                min="0"
-                step="0.01"
                 value={pricePerGame}
-                onChange={(e) => setPricePerGame(moneyValue(e.target.value))}
+                onCommit={setPricePerGame}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="pricePerReentry">€ reenganche</Label>
-              <Input
+              <MoneyField
                 id="pricePerReentry"
-                type="number"
-                min="0"
-                step="0.01"
                 value={pricePerReentry}
-                onChange={(e) => setPricePerReentry(moneyValue(e.target.value))}
+                onCommit={setPricePerReentry}
               />
             </div>
           </div>

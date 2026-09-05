@@ -15,17 +15,48 @@ export function RoundForm({ session }: { session: RemigioSession }) {
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [points, setPoints] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const activePlayers = session.players.filter((p) => p.status === 'active');
   if (activePlayers.length === 0) return null;
 
+  const handlePointsChange = (playerId: string, raw: string) => {
+    setPoints((p) => ({ ...p, [playerId]: raw }));
+    if (error) setError('');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return; // evita doble registro de la misma ronda
+
+    // Valida enteros >= 0. Vacío = sin asignar (candidato a ganador implícito).
+    const parsed = new Map<string, number | null>();
+    for (const p of activePlayers) {
+      const raw = (points[p.id] ?? '').trim();
+      if (raw === '') {
+        parsed.set(p.id, null);
+        continue;
+      }
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0) {
+        setError('Revisa los puntos: deben ser enteros iguales o mayores que 0.');
+        return;
+      }
+      parsed.set(p.id, n);
+    }
+
+    const missing = activePlayers.filter((p) => parsed.get(p.id) === null);
+    if (missing.length > 1) {
+      setError(`Faltan los puntos de ${missing.length} jugadores.`);
+      return;
+    }
+    // missing.length === 1 → se asume ganador con 0 puntos (no se fuerza a escribirlo).
+    // missing.length === 0 → ronda completa normal.
     const roundPoints = activePlayers.map((p) => ({
       playerId: p.id,
-      points: parseInt(points[p.id] ?? '', 10) || 0,
+      points: parsed.get(p.id) ?? 0,
     }));
+    setError('');
     setSubmitting(true);
     addRound(session.id, roundPoints);
     setPoints({});
@@ -74,10 +105,11 @@ export function RoundForm({ session }: { session: RemigioSession }) {
                     type="number"
                     inputMode="numeric"
                     min={0}
+                    step={1}
                     placeholder="0"
-                    required
                     value={points[player.id] ?? ''}
-                    onChange={(e) => setPoints((p) => ({ ...p, [player.id]: e.target.value }))}
+                    onChange={(e) => handlePointsChange(player.id, e.target.value)}
+                    aria-invalid={error ? true : undefined}
                     className="text-lg font-semibold h-12 text-center"
                   />
                 </div>
@@ -118,10 +150,11 @@ export function RoundForm({ session }: { session: RemigioSession }) {
                           type="number"
                           inputMode="numeric"
                           min={0}
+                          step={1}
                           placeholder="0"
-                          required
                           value={points[player.id] ?? ''}
-                          onChange={(e) => setPoints((p) => ({ ...p, [player.id]: e.target.value }))}
+                          onChange={(e) => handlePointsChange(player.id, e.target.value)}
+                          aria-invalid={error ? true : undefined}
                           className="text-center text-sm font-semibold h-9 px-1"
                         />
                       </td>
@@ -132,7 +165,8 @@ export function RoundForm({ session }: { session: RemigioSession }) {
             </div>
           )}
 
-          <div className="flex justify-end pt-2">
+          <div className="flex items-center justify-end gap-3 pt-2">
+            {error && <span className="text-xs font-semibold text-destructive">{error}</span>}
             <Button type="submit" size="lg" disabled={submitting}>
               <Send className="h-4 w-4" />
               Registrar Ronda
